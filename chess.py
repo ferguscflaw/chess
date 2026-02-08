@@ -338,18 +338,23 @@ def draw_board(event=None):
             t.goto(x + j*sizes(True) + sizes(True)/8, y + i*sizes(True) - sizes(True))
             t.write(piece, font=("Arial", int(sizes(True)*0.6)))
     if game.message != "":
-        show_message(game.message)
+        show_message(game.message[0], game.message[1])
     window.update()
 
 def promote(piece):
     row, col = game.promotion_square
     game.board[row][col] = piece
     game.promotion_square = None
+    game.message = ""
     message.clear()
-    window.onclick(move_pieces)
+    window.onkey(lambda: (), "1")
+    window.onkey(lambda: (), "2")
+    window.onkey(lambda: (), "3")
+    window.onkey(lambda: (), "4")
     game.white_turn = not game.white_turn
     position_check()
     draw_board()
+    window.update()
 
 def animate(row1, col1, row2, col2):
     current_player_piece = game.board[row1][col1]
@@ -386,23 +391,21 @@ def animate(row1, col1, row2, col2):
         if (row1 == 7 if current_player_piece == "♖" else row1 == 0) and (col1 == 0  or col1 == 7):
             game.rook_moved[((0 if current_player_piece == "♖" else 2) + (0 if col1 == 0 else 1))] = True
     game.board[row2][col2] = current_player_piece
-    if current_player_piece in ["♙", "♟"] and (row2 == 0 or row2 == 7):
+    if (current_player_piece == "♙" and row2 == 0) or (current_player_piece == "♟" and row2 == 7):
         game.promotion_square = (row2, col2)
-        message.clear()
-        message.penup()
-        message.goto(0, 0)
         options = (["♕", "♖", "♗", "♘"] if row2 == 0 else ["♛", "♜", "♝", "♞"])
-        message.write("Promote to:\n1: Queen   2: Rook   3: Bishop   4: Knight\nType the number of your choice.", align="center", font=("Arial", 16, "bold"))
+        show_message("Promote to:\n1: Queen   2: Rook   3: Bishop   4: Knight\nEnter the number of your choice.", int(sizes(True)//6))
         window.onkey(lambda: promote(options[0]), "1")
         window.onkey(lambda: promote(options[1]), "2")
         window.onkey(lambda: promote(options[2]), "3")
         window.onkey(lambda: promote(options[3]), "4")
+        window.update()
         window.listen()
     animation.clear()
 
 
-def show_message(msg):
-    game.message = msg
+def show_message(msg, font_size=None):
+    game.message = (msg, font_size)
     message.color("red", "lightblue")
     message.goto(-sizes(False, True) * 0.3, -sizes(False, True) * 0.075)
     message.pendown()
@@ -415,7 +418,7 @@ def show_message(msg):
     message.end_fill()
     message.penup()
     message.goto(0, 0)
-    message.write(msg, align="center", font=("Arial", int(sizes(True) * 0.35), "bold"))
+    message.write(msg, align="center", font=("Arial", (font_size if font_size != None else int(sizes(True) * 0.35)), "bold"))
     window.onclick(close_message)
     
 def close_message(x, y):
