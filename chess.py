@@ -47,12 +47,12 @@ def base64(data, encode=True):
     # I specially created this to work for only my program (definitely not because I couldn't care less about padding), so it will decrypt incorrectly if you try it with programs other people made.
     # Unless you turn all = into A, where it will work. This base 64 code is copyright. Unless you ask to use it and I give permission.
     # The changing of for loop to enumerating was Google AI's idea, so that section, sum(alphabet.index(character) << (6 * (3-index)) for index, character in enumerate(chunk)), is not copyright. Nothing more.
-    # I have changed this into oneline as much as I can, but if you want the original base 64 code I made, feel free to ask.
+    # I have changed this into oneline as much as I can (but I am pretty sure it can still be shortened further), but if you want the original base 64 code I made, feel free to ask.
     alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
     result = []
-    bytes = ([ord(c) for c in data] if encode else data)
-    for nibbling_bit in (range(0, len(bytes), 3) if encode else range(0, len(data), 4)):
-        chunk = bytes[nibbling_bit:nibbling_bit+(3 if encode else 4)]
+    bytes_of_text = ([ord(c) for c in data] if encode else data)
+    for nibbling_bit in (range(0, len(bytes_of_text), 3) if encode else range(0, len(data), 4)):
+        chunk = bytes_of_text[nibbling_bit:nibbling_bit+(3 if encode else 4)]
         chunk += ([0, 0, 0][:-len(chunk)] if encode else "")
         combined = ((chunk[0] << 16) | (chunk[1] << 8) | chunk[2]) if encode else sum(alphabet.index(character) << (6 * (3-index)) for index, character in enumerate(chunk))
         for shift in ((18, 12, 6, 0) if encode else (16, 8, 0)):
@@ -294,18 +294,25 @@ def draw_board(event=None):
             t.penup()
             t.goto(round(x + j*sizes(True)), round(y + i*sizes(True)))
             t.pendown()
+            if (i + j) % 2 == 0:
+                t.fillcolor("#E4C4B4")
+            else:
+                t.fillcolor("#F5F5D5")
+            t.begin_fill()
             for side in range(4):
                 t.forward(sizes(True))
                 t.right(90)
+            t.end_fill()
             if (7-i, j) in game.selected:
                 t.penup()
                 t.goto(x + j*sizes(True), y + i*sizes(True))
                 t.pendown()
-                t.pensize(3)
-                for _ in range(4):
+                t.fillcolor(("#D0FFD0" if game.white_turn else "#7F907F"))
+                t.begin_fill()
+                for side in range(4):
                     t.forward(sizes(True))
                     t.right(90)
-                t.pensize(1)
+                t.end_fill()
             piece = game.board[7-i][j]
             t.penup()
             t.goto(x + j*sizes(True) + sizes(True)/8, y + i*sizes(True) - sizes(True))
