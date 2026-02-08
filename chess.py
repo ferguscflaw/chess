@@ -70,7 +70,7 @@ def get_position_state():
 
 
 class game_state:
-    def __init__(self, data=None):
+    def __init__(self):
         self.setup_start_position()
         
     def setup_start_position(self):
@@ -125,6 +125,7 @@ class game_state:
         self.rook_moved = [c == "1" for c in data_sections[5]]
         self.game_over = False
         draw_board()
+        position_check()
 
 def game_data(export=True):
     if export:
@@ -133,13 +134,13 @@ def game_data(export=True):
         show_message("Game code copied!")
     else:
         data = window.textinput("Import Game", "Enter your game code:")
+        window.onkey(lambda: game_data(False), "i")
+        window.onkey(lambda: game_data(), "e")
+        window.listen()
         try:
             game.continue_game(data)
         except:
             show_message("Invalid code")
-            window.onkey(lambda: game_data(False), "i")
-            window.onkey(lambda: game_data(), "e")
-            window.listen()
 
 
 
@@ -198,22 +199,14 @@ def piece_move_valid(origin, target):
             white_king = (piece_to_move == "♔")
             if not game.king_moved[(0 if white_king else 1)]:
                 kingside = (dx == 2)
-                if (dx == 2 if kingside else dx == -2):
-                    if game.rook_moved[((0 if kingside else 1) + (0 if white_king else 2))]:
-                        return False
-                    elif game.board[(7 if white_king else 0)][(7 if kingside else 0)] not in ["♖", "♜"]:
-                        return False
-                    elif game.board[row1][(5 if kingside else 1)] != "" or (game.board[row1][6] != "" if kingside else (game.board[row1][2] != "" or game.board[row1][3] != "")):
-                        return False
-                    else:
-                        return True
+                if (game.rook_moved[((1 if kingside else 0) + (0 if white_king else 2))]) or (game.board[(7 if white_king else 0)][(7 if kingside else 0)] not in ["♖", "♜"]) or (game.board[row1][(5 if kingside else 1)] != "" or (game.board[row1][6] != "" if kingside else (game.board[row1][2] != "" or game.board[row1][3] != ""))):
+                    return False
+                return True
             return False
-        else:
-            return False
+        return False
     else:
         pieces = ["♗", "♝", "♖", "♜", "♕", "♛"]
-        valid_movements = [(abs(dy) == abs(dx)), (dy == 0 or dx == 0)]
-        valid_movements.append((valid_movements[0] or valid_movements[1]))
+        valid_movements = [(a:=abs(dy)==abs(dx)), (b:=dy==0 or dx==0), (a or b)]
 
         if valid_movements[pieces.index(piece_to_move) // 2]:
             return gonna_crash(row1, col1, row2, col2)
