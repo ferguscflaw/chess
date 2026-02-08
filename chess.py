@@ -175,6 +175,7 @@ def piece_move_valid(origin, target):
     (row1, col1), (row2, col2) = origin, target
     dy, dx = (row2 - row1), (col2 - col1)
     piece_to_move, target_piece = game.board[row1][col1], game.board[row2][col2]
+    
     if piece_to_move in ["♙", "♟"]:
         white_pawn = (piece_to_move == "♙")
         if dx == 0 and target_piece == "":
@@ -210,8 +211,7 @@ def piece_move_valid(origin, target):
 
         if valid_movements[pieces.index(piece_to_move) // 2]:
             return gonna_crash(row1, col1, row2, col2)
-        else:
-            return False
+        return False
 
 def in_check(white):
     king = "♔" if white else "♚"
@@ -238,51 +238,35 @@ def in_check(white):
 def valid_move(origin, target):
     (row1, col1), (row2, col2) = origin, target
     if game.board[row2][col2] != "":
-        if game.board[row1][col1] in game.white_pieces and game.board[row2][col2] in game.white_pieces:
-            return False
-        if game.board[row1][col1] in game.black_pieces and game.board[row2][col2] in game.black_pieces:
+        if (game.board[row1][col1] in game.white_pieces and game.board[row2][col2] in game.white_pieces) or (game.board[row1][col1] in game.black_pieces and game.board[row2][col2] in game.black_pieces):
             return False
         
     if not piece_move_valid(origin, target):
         return False
     
-    piece_to_move, target_piece = game.board[row1][col1], game.board[row2][col2]
-    game.board[row1][col1], game.board[row2][col2] = "", game.board[row1][col1]
+    piece_to_move, target_piece, game.board[row1][col1], game.board[row2][col2] = game.board[row1][col1], game.board[row2][col2],"", game.board[row1][col1]
     if in_check((game.board[row2][col2] in game.white_pieces)):
         game.board[row1][col1], game.board[row2][col2] = piece_to_move, target_piece
         return False
     elif piece_to_move in ["♔", "♚"] and abs(col2 - col1) == 2:
-        white = (piece_to_move == "♔")
-        if in_check(white):
-            game.board[row1][col1], game.board[row2][col2] = piece_to_move, target_piece
-            return False
-        direction = 1 if col2 > col1 else -1
-        col = col1 + direction
+        game.board[row1][col1], game.board[row2][col2] = piece_to_move, target_piece
+        white, direction, col = (piece_to_move == "♔"), (1 if col2 > col1 else -1), col1
         while col != col2:
-            original_piece = game.board[row1][col]
-            game.board[row1][col1], game.board[row1][col] = "", piece_to_move
+            original_piece, game.board[row1][col1], game.board[row1][col] = game.board[row1][col], "", piece_to_move
             if in_check(white):
                 game.board[row1][col], game.board[row1][col1], game.board[row2][col2] = original_piece, piece_to_move, target_piece
                 return False
-            game.board[row1][col] = original_piece
-            game.board[row1][col1] = piece_to_move
+            game.board[row1][col], game.board[row1][col1] = original_piece, piece_to_move
             col += direction
-    
     game.board[row1][col1], game.board[row2][col2] = piece_to_move, target_piece
-
     return True
 
 def checkmate_yet(white):
     for row1 in range(8):
         for col1 in range(8):
             piece = game.board[row1][col1]
-            if piece == "":
+            if (piece == "") or (white and piece not in game.white_pieces) or (not white and piece not in game.black_pieces):
                 continue
-            elif white and piece not in game.white_pieces:
-                continue
-            elif not white and piece not in game.black_pieces:
-                continue
-
             for row2 in range(8):
                 for col2 in range(8):
                     if valid_move((row1, col1), (row2, col2)):
