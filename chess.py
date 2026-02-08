@@ -1,5 +1,4 @@
 from turtle import *
-import time
 
 window = Screen()
 window.title("Chess")
@@ -101,8 +100,8 @@ class game_state:
         self.white_turn = (data_sections[1] == "w")
         self.en_passent_target = None if data_sections[2] == "-" else tuple(map(int, data_sections[2].split(",")))
         self.halfmoves = int(data_sections[3])
-        self.king_moved = [c=="1" for c in data_sections[4]]
-        self.rook_moved = [c=="1" for c in data_sections[5]]
+        self.king_moved = [c == "1" for c in data_sections[4]]
+        self.rook_moved = [c == "1" for c in data_sections[5]]
         draw_board()
 
 def game_data(export=True):
@@ -336,7 +335,8 @@ def animate(row1, col1, row2, col2):
     animation.penup()
     animation.goto(x1, y1)
     for frame in range(75):
-        time.sleep(0.001)
+        for iteration_of_nothing in range(100000):
+            pass
         animation.clear()
         animation.goto(x1 + dx*frame, y1 + dy*frame)
         animation.write(current_player_piece, font=("Arial", int(sizes(True)*0.6)))
@@ -463,7 +463,6 @@ show_message("i - import game.\ne - export game")
 if __name__ == "__main__":
     game = game_state()
     position_check()
-    print(game.export())
     draw_board()
 
     done()
