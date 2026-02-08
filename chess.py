@@ -8,7 +8,6 @@ t = Turtle()
 t.hideturtle()
 t.speed(0)
 t.setheading(0)
-t.pensize(1)
 
 animation = Turtle()
 animation.hideturtle()
@@ -62,6 +61,14 @@ def base64(data, encode=True):
 def get_position_state():
     return (tuple(tuple(row) for row in game.board), game.white_turn, tuple(game.king_moved), tuple(game.rook_moved))
 
+
+
+
+
+
+
+
+
 class game_state:
     def __init__(self, data=None):
         self.setup_start_position()
@@ -81,7 +88,7 @@ class game_state:
             ["♙","♙","♙","♙","♙","♙","♙","♙"],
             ["♖","♘","♗","♕","♔","♗","♘","♖"],
         ]
-        self.pieces_map = { "♙": "p", "♖": "r", "♘": "n", "♗": "b", "♕": "q", "♔": "k", "♟": "P", "♜": "R", "♞": "N", "♝": "B", "♛": "Q", "♚": "K", "": "-" }
+        self.pieces_map = { "♙": "p", "♖": "r", "♘": "n", "♗": "b", "♕": "q", "♔": "k", "♟": "P", "♜": "R", "♞": "N", "♝": "B", "♛": "Q", "♚": "K" }
         self.letter_map = { letter: piece_name for piece_name, letter in self.pieces_map.items() }
         self.selected = []
         self.white_turn = True
@@ -90,13 +97,26 @@ class game_state:
         self.halfmoves = 0
         self.history = {}
         self.promotion_square = None
+
+    def format_row(self, row, compress=True):
+        result = ("" if compress else [])
+        if compress:
+            for piece in row:
+                result = (result+self.pieces_map[piece] if piece != "" else (result+"1" if (len(result) == 0 or result[-1] in "prnbqkPRNBQK") else result[:-1]+str(int(result[-1])+1)))
+        else:
+            for letter in row:
+                if letter in "prnbqkPRNBQK":
+                    result.append((self.letter_map[letter]))
+                else:
+                    result.extend(([""]*(int(letter))))
+        return result
     
     def export(self):
-        return base64(("|".join(["/".join("".join(self.pieces_map[piece] for piece in row) for row in self.board), ("w" if self.white_turn else "b"), ("-" if self.en_passent_target is None else f"{self.en_passent_target[0]},{self.en_passent_target[1]}"), str(self.halfmoves), ("".join("1" if k else "0" for k in self.king_moved)), ("".join("1" if r else "0" for r in self.rook_moved))])))
+        return base64(("|".join(["/".join(self.format_row(row) for row in self.board), ("w" if self.white_turn else "b"), ("-" if self.en_passent_target is None else f"{self.en_passent_target[0]},{self.en_passent_target[1]}"), str(self.halfmoves), ("".join("1" if k else "0" for k in self.king_moved)), ("".join("1" if r else "0" for r in self.rook_moved))])))
     
     def continue_game(self, data):
         data_sections = base64(data, False).split("|")
-        self.board = [[self.letter_map[piece_letter] for piece_letter in row] for row in data_sections[0].split("/")]
+        self.board = [self.format_row(row, False) for row in data_sections[0].split("/")]
         self.white_turn = (data_sections[1] == "w")
         self.en_passent_target = None if data_sections[2] == "-" else tuple(map(int, data_sections[2].split(",")))
         self.halfmoves = int(data_sections[3])
@@ -465,11 +485,11 @@ window.onclick(move_pieces)
 window.onkey(lambda: game_data(False), "i")
 window.onkey(lambda: game_data(), "e")
 window.listen()
-show_message("i - import game.\ne - export game")
 
 if __name__ == "__main__":
     game = game_state()
     position_check()
     draw_board()
+    show_message("i - import game.\ne - export game")
 
     done()
