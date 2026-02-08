@@ -97,6 +97,7 @@ class game_state:
         self.halfmoves = 0
         self.history = {}
         self.promotion_square = None
+        self.message = ""
 
     def format_row(self, row, compress=True):
         result = ("" if compress else [])
@@ -122,14 +123,13 @@ class game_state:
         self.halfmoves = int(data_sections[3])
         self.king_moved = [c == "1" for c in data_sections[4]]
         self.rook_moved = [c == "1" for c in data_sections[5]]
+        self.game_over = False
         draw_board()
 
 def game_data(export=True):
     if export:
         window._root.clipboard_clear()
         window._root.clipboard_append(game.export())
-        message.clear()
-        message.goto(0, 0)
         show_message("Game code copied!")
     else:
         data = window.textinput("Import Game", "Enter your game code:")
@@ -337,8 +337,8 @@ def draw_board(event=None):
             t.penup()
             t.goto(x + j*sizes(True) + sizes(True)/8, y + i*sizes(True) - sizes(True))
             t.write(piece, font=("Arial", int(sizes(True)*0.6)))
-    if len(game.selected) == 1:
-        show_moves()
+    if game.message != "":
+        show_message(game.message)
     window.update()
 
 def promote(piece):
@@ -400,7 +400,9 @@ def animate(row1, col1, row2, col2):
         window.listen()
     animation.clear()
 
+
 def show_message(msg):
+    game.message = msg
     message.color("red", "lightblue")
     message.goto(-sizes(False, True) * 0.3, -sizes(False, True) * 0.075)
     message.pendown()
@@ -417,6 +419,7 @@ def show_message(msg):
     window.onclick(close_message)
     
 def close_message(x, y):
+    game.message = ""
     message.clear()
     window.onclick(move_pieces)
 
@@ -478,6 +481,8 @@ def move_pieces(x, y):
         else:
             game.selected = []
     draw_board()
+    if len(game.selected) == 1:
+        show_moves()
 
 
 window.getcanvas().bind("<Configure>", draw_board)
@@ -488,7 +493,6 @@ window.listen()
 
 if __name__ == "__main__":
     game = game_state()
-    position_check()
     draw_board()
     show_message("i - import game.\ne - export game")
 
