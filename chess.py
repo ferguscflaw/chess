@@ -273,6 +273,40 @@ def checkmate_yet(white):
                         return False
     return True
 
+def special_cases(current_player_piece, row1, col1, row2, col2):
+    if current_player_piece in ["♙", "♟"] and game.en_passent_target == (row2, col2):
+        game.board[(row2-(-1 if current_player_piece == "♙" else 1))][col2] = ""
+    if current_player_piece == "♙" and row1 == 6 and row2 == 4:
+        game.en_passent_target = (5, col2)
+    elif current_player_piece == "♟" and row1 == 1 and row2 == 3:
+        game.en_passent_target = (2, col2)
+    else:
+        game.en_passent_target = None
+
+
+    if current_player_piece in ["♙", "♟"] or game.board[row2][col2] != "":
+        game.halfmoves = 0
+    else:
+        game.halfmoves += 1
+
+    if current_player_piece in ["♔", "♚"]:
+        game.king_moved[(0 if current_player_piece == "♔" else 1)] = True
+    elif current_player_piece in ["♖", "♜"] and ((row1 == 7 if current_player_piece == "♖" else row1 == 0) and (col1 == 0  or col1 == 7)):
+        game.rook_moved[((0 if current_player_piece == "♖" else 2) + (0 if col1 == 0 else 1))] = True
+
+    game.board[row2][col2] = current_player_piece
+    
+    if (current_player_piece == "♙" and row2 == 0) or (current_player_piece == "♟" and row2 == 7):
+        game.promotion_square = (row2, col2)
+        options = (["♕", "♖", "♗", "♘"] if row2 == 0 else ["♛", "♜", "♝", "♞"])
+        show_message("Promote to:\n1: Queen   2: Rook   3: Bishop   4: Knight\nEnter the number of your choice.", int(sizes(True)//6))
+        window.onkey(lambda: promote(options[0]), "1")
+        window.onkey(lambda: promote(options[1]), "2")
+        window.onkey(lambda: promote(options[2]), "3")
+        window.onkey(lambda: promote(options[3]), "4")
+        window.update()
+        window.listen()
+
 
 
 
@@ -350,34 +384,7 @@ def animate(row1, col1, row2, col2):
         animation.goto(x1 + dx*frame, y1 + dy*frame)
         animation.write(current_player_piece, font=("Arial", int(sizes(True)*0.6)))
         window.update()
-    if current_player_piece in ["♙", "♟"] and game.en_passent_target == (row2, col2):
-        game.board[(row2-(-1 if current_player_piece == "♙" else 1))][col2] = ""
-    if current_player_piece == "♙" and row1 == 6 and row2 == 4:
-        game.en_passent_target = (5, col2)
-    elif current_player_piece == "♟" and row1 == 1 and row2 == 3:
-        game.en_passent_target = (2, col2)
-    else:
-        game.en_passent_target = None
-    if current_player_piece in ["♙", "♟"] or game.board[row2][col2] != "":
-        game.halfmoves = 0
-    else:
-        game.halfmoves += 1
-    if current_player_piece in ["♔", "♚"]:
-        game.king_moved[(0 if current_player_piece == "♔" else 1)] = True
-    elif current_player_piece in ["♖", "♜"]:
-        if (row1 == 7 if current_player_piece == "♖" else row1 == 0) and (col1 == 0  or col1 == 7):
-            game.rook_moved[((0 if current_player_piece == "♖" else 2) + (0 if col1 == 0 else 1))] = True
-    game.board[row2][col2] = current_player_piece
-    if (current_player_piece == "♙" and row2 == 0) or (current_player_piece == "♟" and row2 == 7):
-        game.promotion_square = (row2, col2)
-        options = (["♕", "♖", "♗", "♘"] if row2 == 0 else ["♛", "♜", "♝", "♞"])
-        show_message("Promote to:\n1: Queen   2: Rook   3: Bishop   4: Knight\nEnter the number of your choice.", int(sizes(True)//6))
-        window.onkey(lambda: promote(options[0]), "1")
-        window.onkey(lambda: promote(options[1]), "2")
-        window.onkey(lambda: promote(options[2]), "3")
-        window.onkey(lambda: promote(options[3]), "4")
-        window.update()
-        window.listen()
+    special_cases(current_player_piece, row1, col1, row2, col2)
     animation.clear()
 
 
