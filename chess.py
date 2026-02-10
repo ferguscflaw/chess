@@ -1,7 +1,7 @@
 from turtle import *
 
-def sizes(get_cell_size=False, get_square_size=False, get_smallest=False):
-    smallest = min(window.window_width(), window.window_height())
+def sizes(get_cell_size: bool=False, get_square_size:bool=False, get_smallest:bool=False) -> float:
+    smallest: float = min(window.window_width(), window.window_height())
     if get_smallest:
         return smallest
     elif get_square_size:
@@ -9,45 +9,44 @@ def sizes(get_cell_size=False, get_square_size=False, get_smallest=False):
     elif get_cell_size:
         return sizes(False, True) / 8
 
-def cell_to_coord(row, col):
-    x = -sizes(False, True)/2 + col*sizes(True) + sizes(True)/8
-    y = -sizes(False, True)/2 - sizes(False, False, True)*0.125 + (8-row)*sizes(True)
+def cell_to_coord(row: int, col: int) -> tuple[float, float]:
+    x: float = -sizes(False, True)/2 + col*sizes(True) + sizes(True)/8
+    y: float = -sizes(False, True)/2 - sizes(False, False, True)*0.125 + (8-row)*sizes(True)
     return x, y
 
-def coord_to_cell(x, y):
-    col = int((x + sizes(False, True) / 2) // sizes(True))
-    row = int((y + sizes(False, True) / 2 - sizes(False, False, True) * 0.1 + sizes(True)) // sizes(True))
+def coord_to_cell(x: float, y: float) -> tuple[int | None, int | None]:
+    col: int = int((x + sizes(False, True) / 2) // sizes(True))
+    row: int = int((y + sizes(False, True) / 2 - sizes(False, False, True) * 0.1 + sizes(True)) // sizes(True))
     if 0 <= row and 0 <= col < 8:
         return row, col
-    else:
-        return None, None
+    return None, None
 
-def base64(data, encode=True):
+def base64(data: str, encode: bool=True) -> str:
     # I specially created this to work for only my program (definitely not because I couldn't care less about padding), so it will decrypt incorrectly if you try it with programs other people made.
-    # Unless you turn all = into A, where it will work. This base 64 code is copyright. Unless you ask to use it and I give permission.
+    # Unless you turn all = into A, where decryption will work. This base 64 code is copyright. Unless you ask to use it and I give permission.
     # The changing of for loop to enumerating was Google AI's idea, so that section, sum(alphabet.index(character) << (6 * (3-index)) for index, character in enumerate(chunk)), is not copyright. Nothing more.
     # I have changed this into oneline as much as I can (but I am pretty sure it can still be shortened further), but if you want the original base 64 code I made, feel free to ask.
-    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-    result = []
-    bytes_of_text = ([ord(c) for c in data] if encode else data)
+    alphabet: str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    result: list[str | int] = []
+    bytes_of_text: list[int] | str = ([ord(c) for c in data] if encode else data)
     for nibbling_bit in (range(0, len(bytes_of_text), 3) if encode else range(0, len(data), 4)):
         chunk = bytes_of_text[nibbling_bit:nibbling_bit+(3 if encode else 4)]
         chunk += ([0, 0, 0][:-len(chunk)] if encode else "")
-        combined = ((chunk[0] << 16) | (chunk[1] << 8) | chunk[2]) if encode else sum(alphabet.index(character) << (6 * (3-index)) for index, character in enumerate(chunk))
+        combined: int = ((chunk[0] << 16) | (chunk[1] << 8) | chunk[2]) if encode else sum(alphabet.index(character) << (6 * (3-index)) for index, character in enumerate(chunk))
         for shift in ((18, 12, 6, 0) if encode else (16, 8, 0)):
             result.append((alphabet[((combined >> shift) & 0b111111)]) if encode else ((combined >> shift) & 0b11111111))
     return "".join((b if encode else chr(b)) for b in result)
 
 class GameState:
-    def __init__(self):
+    def __init__(self) -> None:
         self.setup_start_position()
         
-    def setup_start_position(self):
-        self.white_pieces = ["♙", "♘", "♗", "♖", "♕", "♔"]
-        self.black_pieces = ["♟", "♞", "♝", "♜", "♛", "♚"]
-        self.king_moved = [False, False]
-        self.rook_moved = [False, False, False, False]
-        self.board = [
+    def setup_start_position(self) -> None:
+        self.white_pieces: list[str] = ["♙", "♘", "♗", "♖", "♕", "♔"]
+        self.black_pieces: list[str] = ["♟", "♞", "♝", "♜", "♛", "♚"]
+        self.king_moved: list[bool] = [False, False]
+        self.rook_moved: list[bool] = [False, False, False, False]
+        self.board: list[list[str]] = [
             ["♜","♞","♝","♛","♚","♝","♞","♜"],
             ["♟","♟","♟","♟","♟","♟","♟","♟"],
             ["","","","","","","",""],
@@ -57,19 +56,19 @@ class GameState:
             ["♙","♙","♙","♙","♙","♙","♙","♙"],
             ["♖","♘","♗","♕","♔","♗","♘","♖"],
         ]
-        self.pieces_map = { "♙": "p", "♖": "r", "♘": "n", "♗": "b", "♕": "q", "♔": "k", "♟": "P", "♜": "R", "♞": "N", "♝": "B", "♛": "Q", "♚": "K" }
-        self.letter_map = { letter: piece_name for piece_name, letter in self.pieces_map.items() }
-        self.selected = []
-        self.white_turn = True
-        self.en_passent_target = None
-        self.game_over = False
-        self.halfmoves = 0
-        self.history = {}
-        self.promotion_square = None
-        self.message = ""
+        self.pieces_map: dict[str, str] = { "♙": "p", "♖": "r", "♘": "n", "♗": "b", "♕": "q", "♔": "k", "♟": "P", "♜": "R", "♞": "N", "♝": "B", "♛": "Q", "♚": "K" }
+        self.letter_map: dict[str, str] = { letter: piece_name for piece_name, letter in self.pieces_map.items() }
+        self.selected: list[tuple[int, int]] = []
+        self.white_turn: bool = True
+        self.en_passent_target: tuple[int, int] | None = None
+        self.game_over: bool = False
+        self.halfmoves: int = 0
+        self.history: dict[tuple, int] = {}
+        self.promotion_square: tuple[int, int] | None = None
+        self.message: tuple[str, int] | None = None
 
-    def format_row(self, row, compress=True):
-        result = ("" if compress else [])
+    def format_row(self, row: list[str], compress: bool=True) -> list[str] | str:
+        result: list[str] | str = ("" if compress else [])
         if compress:
             for piece in row:
                 result = (result+self.pieces_map[piece] if piece != "" else (result+"1" if (len(result) == 0 or result[-1] in "prnbqkPRNBQK") else result[:-1]+str(int(result[-1])+1)))
@@ -81,10 +80,10 @@ class GameState:
                     result.extend(([""]*(int(letter))))
         return result
     
-    def export(self):
+    def export(self) -> str:
         return base64(("|".join(["/".join(self.format_row(row) for row in self.board), ("w" if self.white_turn else "b"), ("-" if self.en_passent_target is None else f"{self.en_passent_target[0]},{self.en_passent_target[1]}"), str(self.halfmoves), ("".join("1" if k else "0" for k in self.king_moved)), ("".join("1" if r else "0" for r in self.rook_moved))])))
     
-    def continue_game(self, data):
+    def continue_game(self, data) -> None:
         data_sections = base64(data, False).split("|")
         self.board = [self.format_row(row, False) for row in data_sections[0].split("/")]
         self.white_turn = (data_sections[1] == "w")
@@ -96,8 +95,8 @@ class GameState:
 
 
 class ChessGame:
-    def __init__(self, window):
-        self.window = window
+    def __init__(self, window: Screen) -> None:
+        self.window: Screen = window
 
         t = self.t = Turtle()
         t.hideturtle()
@@ -120,24 +119,24 @@ class ChessGame:
         self.show_message("i - Import game.\ne - Export game")
 
 
-    def events(self):
+    def events(self) -> None:
         self.window.getcanvas().bind("<Configure>", self.draw_board)
         self.window.onkey(lambda: self.game_data(False), "i")
         self.window.onkey(lambda: self.game_data(), "e")
         self.window.listen()
 
-    def get_position_state(self):
-        game = self.state
-        return (tuple(tuple(row) for row in game.board), game.white_turn, tuple(game.king_moved), tuple(game.rook_moved))
+    def get_position_state(self) -> tuple[tuple[tuple[str] | bool] | bool]:
+        state: GameState = self.state
+        return (tuple(tuple(row) for row in state.board), state.white_turn, tuple(state.king_moved), tuple(state.rook_moved))
 
-    def game_data(self, export=True):
-        state = self.state
+    def game_data(self, export: bool=True) -> None:
+        state: GameState = self.state
         if export:
             self.window._root.clipboard_clear()
             self.window._root.clipboard_append(state.export())
             self.show_message("Game code copied!")
         else:
-            data = self.window.textinput("Import Game", "Enter your game code:")
+            data: str = self.window.textinput("Import Game", "Enter your game code:")
             self.window.onkey(lambda: self.game_data(False), "i")
             self.window.onkey(lambda: self.game_data(), "e")
             self.window.listen()
@@ -148,24 +147,27 @@ class ChessGame:
             except:
                 self.show_message("Invalid code")
 
-    def check_turn(self, row, col):
-        state = self.state
+    def check_turn(self, row: int, col: int) -> bool:
+        state: GameState = self.state
         if len(state.selected) == 0:
             if state.white_turn:
-                check_turn = state.board[row][col] in state.white_pieces
+                check_turn: bool = state.board[row][col] in state.white_pieces
             else:
-                check_turn = state.board[row][col] in state.black_pieces
+                check_turn: bool = state.board[row][col] in state.black_pieces
         elif len(state.selected) == 1:
             if state.white_turn:
-                check_turn = state.board[row][col] in state.black_pieces or state.board[row][col] == ""
+                check_turn: bool = state.board[row][col] in state.black_pieces or state.board[row][col] == ""
             else:
-                check_turn = state.board[row][col] in state.white_pieces or state.board[row][col] == ""
+                check_turn: bool = state.board[row][col] in state.white_pieces or state.board[row][col] == ""
         return check_turn
 
-    def gonna_crash(self, row1, col1, row2, col2):
-        dy, dx = (row2 - row1), (col2 - col1)
-        row_direction, col_direction = (0 if dy == 0 else (-1 if dy < 0 else 1)), (0 if dx == 0 else (-1 if dx < 0 else 1))
-        row, col = row1 + row_direction, col1 + col_direction
+    def gonna_crash(self, row1: int, col1: int, row2: int, col2: int) -> bool:
+        dy: int = (row2 - row1)
+        dx: int = (col2 - col1)
+        row_direction: int = (0 if dy == 0 else (-1 if dy < 0 else 1))
+        col_direction: int = (0 if dx == 0 else (-1 if dx < 0 else 1))
+        row: int = row1 + row_direction
+        col: int = col1 + col_direction
         while (row, col) != (row2, col2):
             if self.state.board[row][col] != "":
                 return False
@@ -173,51 +175,51 @@ class ChessGame:
             col += col_direction
         return True
 
-    def piece_move_valid(self, origin, target):
-        state = self.state
+    def piece_move_valid(self, origin: tuple[int, int], target: tuple[int, int]) -> bool:
+        state: GameState = self.state
         (row1, col1), (row2, col2) = origin, target
-        dy, dx = (row2 - row1), (col2 - col1)
-        piece_to_move, target_piece = state.board[row1][col1], state.board[row2][col2]
+        dy: int = (row2 - row1)
+        dx: int = (col2 - col1)
+        piece_to_move: str = state.board[row1][col1]
+        target_piece: str = state.board[row2][col2]
         
         if piece_to_move in ["♙", "♟"]:
-            white_pawn = (piece_to_move == "♙")
+            white_pawn: bool = (piece_to_move == "♙")
             if dx == 0 and target_piece == "":
                 if (dy == -1 if white_pawn else dy == 1):
                     return True
                 elif (row1 == 6 if white_pawn else row1 == 1) and (dy == -2 if white_pawn else dy == 2) and (state.board[row1-1][col1] == "" if white_pawn else state.board[row1+1][col1] == ""):
                     return True
             elif abs(dx) == 1 and (dy == -1 if white_pawn else dy == 1):
-                if (target_piece in state.black_pieces if white_pawn else target_piece in state.white_pieces):
-                    return True
-                elif state.en_passent_target == (row2, col2):
+                if (target_piece in state.black_pieces if white_pawn else target_piece in state.white_pieces) or (state.en_passent_target == (row2, col2)):
                     return True
             return False
 
         elif piece_to_move in ["♘", "♞"]:
-            return (abs(dy), abs(dx)) in [(1, 2), (2, 1)]
+            return (abs(dy*dx) == 2)
         
         elif piece_to_move in ["♔", "♚"]:
             if max(abs(dy), abs(dx)) == 1:
                 return True
             elif dy == 0 and abs(dx) == 2:
-                white_king = (piece_to_move == "♔")
+                white_king: bool = (piece_to_move == "♔")
                 if not state.king_moved[(0 if white_king else 1)]:
-                    kingside = (dx == 2)
+                    kingside: bool = (dx == 2)
                     if (state.rook_moved[((1 if kingside else 0) + (0 if white_king else 2))]) or (state.board[(7 if white_king else 0)][(7 if kingside else 0)] not in ["♖", "♜"]) or (state.board[row1][(5 if kingside else 1)] != "" or (state.board[row1][6] != "" if kingside else (state.board[row1][2] != "" or state.board[row1][3] != ""))):
                         return False
                     return True
             return False
         else:
-            pieces = ["♗", "♝", "♖", "♜", "♕", "♛"]
-            valid_movements = [(a:=abs(dy)==abs(dx)), (b:=dy==0 or dx==0), (a or b)]
+            pieces: list[str] = ["♗", "♝", "♖", "♜", "♕", "♛"]
+            valid_movements: list[bool] = [(a:=abs(dy)==abs(dx)), (b:=dy==0 or dx==0), (a or b)]
 
             if valid_movements[pieces.index(piece_to_move) // 2]:
                 return self.gonna_crash(row1, col1, row2, col2)
             return False
 
-    def in_check(self, white):
-        state = self.state
-        king = "♔" if white else "♚"
+    def in_check(self, white: bool) -> bool:
+        state: GameState = self.state
+        king: tuple[int, int] | str = ("♔" if white else "♚")
         for row in range(8):
             for col in range(8):
                 if state.board[row][col] == king:
@@ -227,7 +229,7 @@ class ChessGame:
                 break
         for row in range(8):
             for col in range(8):
-                piece_to_check = state.board[row][col]
+                piece_to_check: str = state.board[row][col]
                 if piece_to_check == "":
                     continue
                 elif white and piece_to_check in state.white_pieces:
@@ -238,8 +240,8 @@ class ChessGame:
                     return True
         return False
 
-    def valid_move(self, origin, target):
-        state = self.state
+    def valid_move(self, origin: tuple[int, int], target: tuple[int, int]) -> bool:
+        state: GameState = self.state
         (row1, col1), (row2, col2) = origin, target
         if state.board[row2][col2] != "":
             if (state.board[row1][col1] in state.white_pieces and state.board[row2][col2] in state.white_pieces) or (state.board[row1][col1] in state.black_pieces and state.board[row2][col2] in state.black_pieces):
@@ -248,13 +250,17 @@ class ChessGame:
         if not self.piece_move_valid(origin, target):
             return False
         
-        piece_to_move, target_piece, state.board[row2][col2], state.board[row1][col1] = state.board[row1][col1], state.board[row2][col2], state.board[row1][col1], ""
+        piece_to_move: str = state.board[row1][col1]
+        target_piece: str = state.board[row2][col2]
+        state.board[row2][col2], state.board[row1][col1] = state.board[row1][col1], ""
         if self.in_check((state.board[row2][col2] in state.white_pieces)):
             state.board[row1][col1], state.board[row2][col2] = piece_to_move, target_piece
             return False
         elif piece_to_move in ["♔", "♚"] and abs(col2 - col1) == 2:
             state.board[row1][col1], state.board[row2][col2] = piece_to_move, target_piece
-            white, direction, col = (piece_to_move == "♔"), (1 if col2 > col1 else -1), col1
+            white: bool = (piece_to_move == "♔")
+            direction: int = (1 if col2 > col1 else -1)
+            col: int = col1
             while col != col2:
                 original_piece, state.board[row1][col1], state.board[row1][col] = state.board[row1][col], "", piece_to_move
                 if self.in_check(white):
@@ -265,11 +271,11 @@ class ChessGame:
         state.board[row1][col1], state.board[row2][col2] = piece_to_move, target_piece
         return True
 
-    def checkmate_yet(self, white):
-        state = self.state
+    def checkmate_yet(self, white: bool) -> bool:
+        state: GameState = self.state
         for row1 in range(8):
             for col1 in range(8):
-                piece = state.board[row1][col1]
+                piece: str = state.board[row1][col1]
                 if (piece == "") or (white and piece not in state.white_pieces) or (not white and piece not in state.black_pieces):
                     continue
                 for row2 in range(8):
@@ -278,8 +284,8 @@ class ChessGame:
                             return False
         return True
 
-    def special_cases(self, current_player_piece, row1, col1, row2, col2):
-        state = self.state
+    def special_cases(self, current_player_piece: str, row1: int, col1: int, row2: int, col2: int) -> None:
+        state: GameState = self.state
         if current_player_piece in ["♙", "♟"] and state.en_passent_target == (row2, col2):
             state.board[(row2-(-1 if current_player_piece == "♙" else 1))][col2] = ""
         if current_player_piece == "♙" and row1 == 6 and row2 == 4:
@@ -304,7 +310,7 @@ class ChessGame:
         
         if (current_player_piece == "♙" and row2 == 0) or (current_player_piece == "♟" and row2 == 7):
             state.promotion_square = (row2, col2)
-            options = (["♕", "♖", "♗", "♘"] if row2 == 0 else ["♛", "♜", "♝", "♞"])
+            options: list[str] = (["♕", "♖", "♗", "♘"] if row2 == 0 else ["♛", "♜", "♝", "♞"])
             self.show_message("Promote to:\n1: Queen   2: Rook   3: Bishop   4: Knight\nEnter the number of your choice.", int(sizes(True)//6))
             self.window.onkey(lambda: self.promote(options[0]), "1")
             self.window.onkey(lambda: self.promote(options[1]), "2")
@@ -321,12 +327,12 @@ class ChessGame:
 
 
 
-    def draw_board(self, event=None):
+    def draw_board(self, event=None) -> None:
         t, state = self.t, self.state
         self.window.tracer(0, 0)
         t.clear()
-        x = -sizes(False, True) / 2
-        y = -sizes(False, True) / 2 + sizes(False, False, True) * 0.1
+        x: float = -sizes(False, True) / 2
+        y: float = -sizes(False, True) / 2 + sizes(False, False, True) * 0.1
         for i in range(8):
             for j in range(8):
                 t.penup()
@@ -351,20 +357,20 @@ class ChessGame:
                         t.forward(sizes(True))
                         t.right(90)
                     t.end_fill()
-                piece = state.board[7-i][j]
+                piece: str = state.board[7-i][j]
                 t.penup()
                 t.goto(x + j*sizes(True) + sizes(True)/8, y + i*sizes(True) - sizes(True))
                 t.write(piece, font=("Arial", int(sizes(True)*0.6)))
-        if state.message != "":
+        if state.message != None:
             self.show_message(state.message[0], state.message[1])
         self.window.update()
 
-    def promote(self, piece):
-        state = self.state
+    def promote(self, piece: str) -> None:
+        state: GameState = self.state
         row, col = state.promotion_square
         state.board[row][col] = piece
         state.promotion_square = None
-        state.message = ""
+        state.message = None
         self.message.clear()
         self.window.onkey(lambda: (), "1")
         self.window.onkey(lambda: (), "2")
@@ -375,13 +381,15 @@ class ChessGame:
         self.draw_board()
         self.window.update()
 
-    def animate(self, row1, col1, row2, col2):
-        state, animation = self.state, self.animation
-        current_player_piece = state.board[row1][col1]
+    def animate(self, row1: int, col1: int, row2: int, col2: int) -> None:
+        state: GameState = self.state
+        animation: Turtle = self.animation
+        current_player_piece: str = state.board[row1][col1]
         if current_player_piece in ["♔", "♚"] and abs(col2 - col1) == 2:
             self.animate(row1, (7 if col1 < col2 else 0), row2, (col2 + (-1 if col1 < col2 else 1)))
         state.board[row1][col1], state.board[row2][col2], (x1, y1), (x2, y2) = "", "", cell_to_coord(row1, col1), cell_to_coord(row2, col2)
-        dy, dx = ((y2 - y1) / 75), ((x2 - x1) / 75)
+        dy: float = ((y2 - y1) / 75)
+        dx: float = ((x2 - x1) / 75)
         self.draw_board()
         animation.clear()
         animation.penup()
@@ -397,8 +405,8 @@ class ChessGame:
         animation.clear()
 
 
-    def show_message(self, msg, font_size=None):
-        message = self.message
+    def show_message(self, msg: str, font_size: int | None=None) -> None:
+        message: Turtle = self.message
         self.state.message = (msg, font_size)
         message.color("red", "lightblue")
         message.goto(-sizes(False, True) * 0.3, -sizes(False, True) * 0.075)
@@ -415,13 +423,13 @@ class ChessGame:
         message.write(msg, align="center", font=("Arial", (font_size if font_size != None else int(sizes(True) * 0.35)), "bold"))
         self.window.onclick(self.close_message)
         
-    def close_message(self, x, y):
-        self.state.message = ""
+    def close_message(self, x: float, y: float) -> None:
+        self.state.message = None
         self.message.clear()
         self.window.onclick(self.move_pieces)
 
-    def show_moves(self):
-        t = self.t
+    def show_moves(self) -> None:
+        t: Turtle = self.t
         row1, col1 = self.state.selected[0]
         for row in range(8):
             for col in range(8):
@@ -432,8 +440,8 @@ class ChessGame:
                     t.dot(int(sizes(True) * 0.2), "green")
                     t.penup()
 
-    def position_check(self):
-        state = self.state
+    def position_check(self) -> None:
+        state: GameState = self.state
         show_message = self.show_message
         state.history[self.get_position_state()] = state.history.get(self.get_position_state(), 0) + 1
         if self.in_check(state.white_turn):
@@ -453,8 +461,8 @@ class ChessGame:
                 show_message("Stalemate!")
                 state.game_over = True
 
-    def move_pieces(self, x, y):
-        state = self.state
+    def move_pieces(self, x: float, y: float) -> None:
+        state: GameState = self.state
         if state.game_over:
             return
         row, col = coord_to_cell(x, y)
@@ -485,6 +493,6 @@ if __name__ == "__main__":
     window.title("Chess")
     window.getcanvas().winfo_toplevel().minsize(500, 500)
 
-    chess_game = ChessGame(window)
+    chess_game: ChessGame = ChessGame(window)
 
     done()
