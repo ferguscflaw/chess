@@ -114,9 +114,9 @@ class GameState:
 
 class ChessGame:
     # Initialise the game and the turtles
-    def __init__(self, window: turtle.Screen) -> None:
+    def __init__(self, window: turtle.Screen, ai_active: str) -> None:
         self.window: turtle.Screen = window
-
+        self.ai_active: bool = (True if ai_active == "y" else False)
         # t because I didn't have the foresight to see that I needed another 2 turtles for animation and messages
         t = self.t = turtle.Turtle()
         t.hideturtle()
@@ -185,7 +185,7 @@ class ChessGame:
         if len(state.selected) == 0:
             check_turn: bool = ((state.board[row][col] in state.white_pieces) == state.white_turn)
         elif len(state.selected) == 1:
-            check_turn: bool = ((state.board[row][col] in state.black_pieces) != state.white_turn) or state.board[row][col] == ""
+            check_turn: bool = ((state.board[row][col] in state.white_pieces) != state.white_turn) or state.board[row][col] == ""
         return check_turn
 
     # Make sure that the piece can't go through other pieces.
@@ -314,8 +314,9 @@ class ChessGame:
         return True
 
     # Check if it is checkmate yet
-    def checkmate_yet(self, white: bool) -> bool:
+    def checkmate_yet(self, white: bool, find_moves: bool=False) -> list[tuple[tuple[int, int]]] | bool:
         state: GameState = self.state
+        moves: list[tuple[tuple[int, int]]] = []
         for row1 in range(8):
             for col1 in range(8):
                 piece: str = state.board[row1][col1]
@@ -324,8 +325,11 @@ class ChessGame:
                 for row2 in range(8):
                     for col2 in range(8):
                         if self.valid_move((row1, col1), (row2, col2)):
-                            return False
-        return True
+                            if find_moves:
+                                moves.append(((row1, col1), (row2, col2)))
+                            else:
+                                return False
+        return (moves if find_moves else True)
 
     # Check for special cases, ie, en passant, castling logic, promotion, 50 move rule
     def special_cases(self, current_player_piece: str, row1: int, col1: int, row2: int, col2: int) -> None:
@@ -367,6 +371,42 @@ class ChessGame:
             self.window.listen()
 
 
+
+
+
+
+    def score_board(self) -> int:
+        values = { "♙": 1, "♟": -1, "♘": 3, "♞": -3, "♗": 3, "♝": -3, "♖": 5, "♜": -5, "♕": 9, "♛": -9, "♔": 0, "♚": 0, "": 0}
+        score = 0
+        for row in self.state.board:
+            for piece in row:
+                score += values[piece]
+        return score
+    
+    def ai(self) -> None:
+        # Extremely greedy...
+        state: GameState = self.state
+        if state.game_over:
+            return
+        moves: list[tuple[tuple[int, int]]] = self.checkmate_yet(state.white_turn, True)
+        for first_pos in range(len(moves)):
+            pos_to_swap = (hash(str(self.state.history) + str(first_pos))%len(moves))
+            moves[first_pos], moves[pos_to_swap] = moves[pos_to_swap], moves[first_pos]
+        best_score: int = 0
+        best_move: tuple[tuple[int, int]] = moves[0]
+        for move in moves:
+            (row1, col1), (row2, col2) = move
+            piece_to_move, target_piece = state.board[row1][col1], state.board[row2][col2]
+            state.board[row2][col2], state.board[row1][col1] = piece_to_move, ""
+            score = self.score_board()
+            state.board[row1][col1], state.board[row2][col2] = piece_to_move, target_piece
+            if (score > best_score if state.white_turn else score < best_score):
+                best_score, best_move = score, move
+        (row1, col1), (row2, col2) = best_move
+        self.animate(row1, col1, row2, col2)
+        state.white_turn = not state.white_turn
+        self.position_check()
+        self.draw_board()
 
 
 
@@ -543,6 +583,8 @@ class ChessGame:
                 if state.promotion_square == None:
                     state.white_turn = not state.white_turn
                     self.position_check()
+                    if self.ai_active:
+                        self.ai()
                 state.selected = []
             else:
                 state.selected = []
@@ -562,7 +604,7 @@ if __name__ == "__main__":
     window.getcanvas().winfo_toplevel().minsize(500, 500)
 
     # Initialise the chess game.
-    chess_game: ChessGame = ChessGame(window)
+    chess_game: ChessGame = ChessGame(window, window.textinput("AI", "Would you like an AI to play as black? (y/n)"))
 
     # Make it wait for the turtle window to be closed.
     turtle.done()
