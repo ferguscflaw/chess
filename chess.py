@@ -1,5 +1,5 @@
 # The aim of this project is to create a chess program using only turtle. Therefore, only turtle is imported here.
-from turtle import *
+import turtle
 
 # A function for common sizes that are needed for making the window and its elements resize well.
 def sizes(get_cell_size: bool=False, get_square_size:bool=False, get_smallest:bool=False) -> float:
@@ -33,7 +33,7 @@ def base64(data: str, encode: bool=True) -> str:
     # I specially created this to work for only my program (definitely not because I couldn't care less about padding), so it will decrypt incorrectly if you try it with programs other people made.
     # Unless you turn all = into A, where decryption will work. This base 64 code is copyright. Unless you ask to use it and I give permission.
     # The changing of for loop to enumerating was Google AI's idea, so that section, sum(alphabet.index(character) << (6 * (3-index)) for index, character in enumerate(chunk)), is not copyright. Nothing more.
-    # I have changed this into oneline as much as I can (but I am pretty sure it can still be shortened further), but if you want the original base 64 code I made, feel free to ask.
+    # I have changed this into oneline as much as I can using all methods I know of (but I am pretty sure it can still be shortened further), but if you want the original base 64 code I made, feel free to ask.
     alphabet: str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
     result: list[str | int] = []
     bytes_of_text: list[int] | str = ([ord(c) for c in data] if encode else data)
@@ -118,21 +118,21 @@ class GameState:
 
 class ChessGame:
     # Initialise the game and the turtles
-    def __init__(self, window: Screen) -> None:
-        self.window: Screen = window
+    def __init__(self, window: turtle.Screen) -> None:
+        self.window: turtle.Screen = window
 
         # t because I didn't have the foresight to see that I needed another 2 turtles for animation and messages
-        t = self.t = Turtle()
+        t = self.t = turtle.Turtle()
         t.hideturtle()
         t.speed(0)
 
         # For piece animation
-        animation = self.animation = Turtle()
+        animation = self.animation = turtle.Turtle()
         animation.hideturtle()
         animation.speed(0)
 
         # For displaying messages to the user.
-        message = self.message = Turtle()
+        message = self.message = turtle.Turtle()
         message.hideturtle()
         message.speed(0)
 
@@ -448,7 +448,7 @@ class ChessGame:
     # Animation of the piece movements.
     def animate(self, row1: int, col1: int, row2: int, col2: int) -> None:
         state: GameState = self.state
-        animation: Turtle = self.animation
+        animation: turtle.Turtle = self.animation
         current_player_piece: str = state.board[row1][col1]
         if current_player_piece in ["♔", "♚"] and abs(col2 - col1) == 2:
             self.animate(row1, (7 if col1 < col2 else 0), row2, (col2 + (-1 if col1 < col2 else 1)))
@@ -472,7 +472,7 @@ class ChessGame:
 
     # Show messages to the user. Printing to console log creates a bad user experience.
     def show_message(self, msg: str, font_size: int | None=None) -> None:
-        message: Turtle = self.message
+        message: turtle.Turtle = self.message
         self.state.message = (msg, font_size)
         message.color("red", "lightblue")
         message.goto(-sizes(False, True) * 0.3, -sizes(False, True) * 0.075)
@@ -497,7 +497,7 @@ class ChessGame:
 
     # Showing valid moves.
     def show_moves(self) -> None:
-        t: Turtle = self.t
+        t: turtle.Turtle = self.t
         row1, col1 = self.state.selected[0]
         for row in range(8):
             for col in range(8):
@@ -564,7 +564,7 @@ class ChessGame:
 # I don't think there is a need here though, because I haven't split this into many files yet.
 if __name__ == "__main__":
     # Create the screen
-    window = Screen()
+    window = turtle.Screen()
     window.title("Chess")
     # Do some random stuff and set the minimum size of window to be 500 by 500 to stop the user from shrinking the window too much,
     # as my resizing function does not work as well there for obvious reason.
@@ -574,4 +574,4 @@ if __name__ == "__main__":
     chess_game: ChessGame = ChessGame(window)
 
     # Make it wait for the turtle window to be closed.
-    done()
+    turtle.done()
