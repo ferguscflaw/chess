@@ -15,25 +15,20 @@ def sizes(get_cell_size: bool=False, get_square_size:bool=False, get_smallest:bo
 # These random fractions are from testing, so I have no idea why it works. It just does.
 def cell_to_coord(row: int, col: int) -> tuple[float, float]:
     x: float = -sizes(False, True)/2 + col*sizes(True) + sizes(True)/8
-    y: float = -sizes(False, True)/2 - sizes(False, False, True)*0.125 + (8-row)*sizes(True)
+    y: float = -sizes(False, True)/2 - sizes(False, False, True)/8 + (8-row)*sizes(True)
     return x, y
 
 # Turn coordinates from event handler into the corresponding cells in the table
 # These random fractions are from testing, so I have no idea why it works. It just does.
 def coord_to_cell(x: float, y: float) -> tuple[int | None, int | None]:
     col: int = int((x + sizes(False, True) / 2) // sizes(True))
-    row: int = int((y + sizes(False, True) / 2 - sizes(False, False, True) * 0.1 + sizes(True)) // sizes(True))
+    row: int = int((y + sizes(False, True) / 2 - sizes(False, False, True)/10 + sizes(True)) // sizes(True))
     if 0 <= row and 0 <= col < 8:
         return row, col
     return None, None
 
-# A ripoff version of the base 64 function which does not bother with padding - because it works just as well without.
-# Created this to avoid using any extra modules.
+# My version of the base 64 function which does not bother with padding. Created this to avoid using any extra modules.
 def base64(data: str, encode: bool=True) -> str:
-    # I specially created this to work for only my program (definitely not because I couldn't care less about padding), so it will decrypt incorrectly if you try it with programs other people made.
-    # Unless you turn all = into A, where decryption will work. This base 64 code is copyright. Unless you ask to use it and I give permission.
-    # The changing of for loop to enumerating was Google AI's idea, so that section, sum(alphabet.index(character) << (6 * (3-index)) for index, character in enumerate(chunk)), is not copyright. Nothing more.
-    # I have changed this into oneline as much as I can using all methods I know of (but I am pretty sure it can still be shortened further), but if you want the original base 64 code I made, feel free to ask.
     alphabet: str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
     result: list[str | int] = []
     bytes_of_text: list[int] | str = ([ord(c) for c in data] if encode else data)
@@ -69,6 +64,7 @@ class GameState:
         # is unable to handle
         self.pieces_map: dict[str, str] = { "♙": "p", "♖": "r", "♘": "n", "♗": "b", "♕": "q", "♔": "k", "♟": "P", "♜": "R", "♞": "N", "♝": "B", "♛": "Q", "♚": "K" }
         self.letter_map: dict[str, str] = { letter: piece_name for piece_name, letter in self.pieces_map.items() }
+        self.piece_type: dict[str, list[str, str]] = { "pawns": ["♙", "♟"], "rooks": ["♖", "♜"], "knights": ["♘", "♞"], "bishops": ["♗", "♝"], "queens": ["♕", "♛"], "kings": ["♔", "♚"] }
         # Selecting squares
         self.selected: list[tuple[int, int]] = []
         # Is it white's turn?
@@ -138,6 +134,7 @@ class ChessGame:
 
         # Initialise game state
         self.state = GameState()
+        self.piece_type = self.state.piece_type
 
         # Intialise vent listeners
         self.window.onclick(self.move_pieces)
@@ -186,15 +183,9 @@ class ChessGame:
     def check_turn(self, row: int, col: int) -> bool:
         state: GameState = self.state
         if len(state.selected) == 0:
-            if state.white_turn:
-                check_turn: bool = state.board[row][col] in state.white_pieces
-            else:
-                check_turn: bool = state.board[row][col] in state.black_pieces
+            check_turn: bool = ((state.board[row][col] in state.white_pieces) == state.white_turn)
         elif len(state.selected) == 1:
-            if state.white_turn:
-                check_turn: bool = state.board[row][col] in state.black_pieces or state.board[row][col] == ""
-            else:
-                check_turn: bool = state.board[row][col] in state.white_pieces or state.board[row][col] == ""
+            check_turn: bool = ((state.board[row][col] in state.black_pieces) != state.white_turn) or state.board[row][col] == ""
         return check_turn
 
     # Make sure that the piece can't go through other pieces.
@@ -222,7 +213,7 @@ class ChessGame:
         target_piece: str = state.board[row2][col2]
         
         # pawn logic
-        if piece_to_move in ["♙", "♟"]:
+        if piece_to_move in state.piece_type["pawns"]:
             white_pawn: bool = (piece_to_move == "♙")
             if dx == 0 and target_piece == "":
                 if (dy == -1 if white_pawn else dy == 1):
@@ -235,11 +226,11 @@ class ChessGame:
             return False
 
         # knight logic
-        elif piece_to_move in ["♘", "♞"]:
+        elif piece_to_move in state.piece_type["knights"]:
             return (abs(dy*dx) == 2)
         
         # king logic
-        elif piece_to_move in ["♔", "♚"]:
+        elif piece_to_move in state.piece_type["kings"]:
             if max(abs(dy), abs(dx)) == 1:
                 return True
             elif dy == 0 and abs(dx) == 2:
@@ -252,7 +243,7 @@ class ChessGame:
             return False
         else:
             # bishops, rooks, and queen logic
-            pieces: list[str] = ["♗", "♝", "♖", "♜", "♕", "♛"]
+            pieces: list[str] = (state.piece_type["bishops"] + state.piece_type["rooks"] + state.piece_type["queens"])
             valid_movements: list[bool] = [(a:=abs(dy)==abs(dx)), (b:=dy==0 or dx==0), (a or b)]
 
             if valid_movements[pieces.index(piece_to_move) // 2]:
@@ -269,7 +260,7 @@ class ChessGame:
                 if state.board[row][col] == king:
                     king = (row, col)
                     break
-            if king not in ["♔", "♚"]:
+            if king not in state.piece_type["kings"]:
                 break
         # Now do a very inefficient method of going through every square to see if king is attacked.
         for row in range(8):
@@ -306,7 +297,7 @@ class ChessGame:
             # Check if move will put king in check
             state.board[row1][col1], state.board[row2][col2] = piece_to_move, target_piece
             return False
-        elif piece_to_move in ["♔", "♚"] and abs(col2 - col1) == 2:
+        elif piece_to_move in state.piece_type["kings"] and abs(col2 - col1) == 2:
             # Check every square in between for castling
             state.board[row1][col1], state.board[row2][col2] = piece_to_move, target_piece
             white: bool = (piece_to_move == "♔")
@@ -340,7 +331,7 @@ class ChessGame:
     def special_cases(self, current_player_piece: str, row1: int, col1: int, row2: int, col2: int) -> None:
         state: GameState = self.state
         # En passent
-        if current_player_piece in ["♙", "♟"] and state.en_passent_target == (row2, col2):
+        if current_player_piece in state.piece_type["pawns"] and state.en_passent_target == (row2, col2):
             state.board[(row2-(-1 if current_player_piece == "♙" else 1))][col2] = ""
         if current_player_piece == "♙" and row1 == 6 and row2 == 4:
             state.en_passent_target = (5, col2)
@@ -350,15 +341,15 @@ class ChessGame:
             state.en_passent_target = None
 
         # 50 move rule
-        if current_player_piece in ["♙", "♟"] or state.board[row2][col2] != "":
+        if current_player_piece in state.piece_type["pawns"] or state.board[row2][col2] != "":
             state.halfmoves = 0
         else:
             state.halfmoves += 1
 
         # castling logic
-        if current_player_piece in ["♔", "♚"]:
+        if current_player_piece in state.piece_type["kings"]:
             state.king_moved[(0 if current_player_piece == "♔" else 1)] = True
-        elif current_player_piece in ["♖", "♜"] and ((row1 == 7 if current_player_piece == "♖" else row1 == 0) and (col1 == 0  or col1 == 7)):
+        elif current_player_piece in state.piece_type["rooks"] and ((row1 == 7 if current_player_piece == "♖" else row1 == 0) and (col1 == 0  or col1 == 7)):
             state.rook_moved[((0 if current_player_piece == "♖" else 2) + (0 if col1 == 0 else 1))] = True
 
         state.board[row2][col2] = current_player_piece
@@ -450,7 +441,7 @@ class ChessGame:
         state: GameState = self.state
         animation: turtle.Turtle = self.animation
         current_player_piece: str = state.board[row1][col1]
-        if current_player_piece in ["♔", "♚"] and abs(col2 - col1) == 2:
+        if current_player_piece in state.piece_type["kings"] and abs(col2 - col1) == 2:
             self.animate(row1, (7 if col1 < col2 else 0), row2, (col2 + (-1 if col1 < col2 else 1)))
         state.board[row1][col1], state.board[row2][col2], (x1, y1), (x2, y2) = "", "", cell_to_coord(row1, col1), cell_to_coord(row2, col2)
         dy: float = ((y2 - y1) / 75)
