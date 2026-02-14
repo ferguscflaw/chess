@@ -377,11 +377,11 @@ class ChessGame:
 
     def score_board(self) -> int:
         values = { "♙": 1, "♟": -1, "♘": 3, "♞": -3, "♗": 3, "♝": -3, "♖": 5, "♜": -5, "♕": 9, "♛": -9, "♔": 0, "♚": 0, "": 0}
-        score = 0
+        piece_score = 0
         for row in self.state.board:
             for piece in row:
-                score += values[piece]
-        return score
+                piece_score += values[piece]
+        return piece_score
     
     def ai(self) -> None:
         # Extremely greedy...
@@ -390,15 +390,15 @@ class ChessGame:
             return
         moves: list[tuple[tuple[int, int]]] = self.checkmate_yet(state.white_turn, True)
         for first_pos in range(len(moves)):
-            pos_to_swap = (hash(str(self.state.history) + str(first_pos))%len(moves))
+            pos_to_swap: int = (hash(str(self.state.history) + str(first_pos))%len(moves))
             moves[first_pos], moves[pos_to_swap] = moves[pos_to_swap], moves[first_pos]
-        best_score: int = 0
+        best_score: int | float = (float("-inf") if state.white_turn else float("inf"))
         best_move: tuple[tuple[int, int]] = moves[0]
         for move in moves:
             (row1, col1), (row2, col2) = move
             piece_to_move, target_piece = state.board[row1][col1], state.board[row2][col2]
             state.board[row2][col2], state.board[row1][col1] = piece_to_move, ""
-            score = self.score_board()
+            score: int = self.score_board()
             state.board[row1][col1], state.board[row2][col2] = piece_to_move, target_piece
             if (score > best_score if state.white_turn else score < best_score):
                 best_score, best_move = score, move
