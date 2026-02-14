@@ -203,7 +203,7 @@ class ChessGame:
             col += col_direction
         return True
 
-    # The main validation logic for each chess piece
+    # The main logic for each chess piece
     def piece_move_valid(self, origin: tuple[int, int], target: tuple[int, int]) -> bool:
         state: GameState = self.state
         (row1, col1), (row2, col2) = origin, target
@@ -376,15 +376,95 @@ class ChessGame:
 
 
     def score_board(self) -> int:
-        values = { "♙": 1, "♟": -1, "♘": 3, "♞": -3, "♗": 3, "♝": -3, "♖": 5, "♜": -5, "♕": 9, "♛": -9, "♔": 0, "♚": 0, "": 0}
+        #https://www.chessprogramming.org/Evaluation#Basic_Evaluation_Features
+        material_scores: dict[str, int] = { "♙": 100, "♟": -100, "♘": 320, "♞": -320, "♗": 330, "♝": -330, "♖": 500, "♜": -500, "♕": 900, "♛": -900, "♔": 0, "♚": 0 }
+        pawn_ps_table = [
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [50, 50, 50, 50, 50, 50, 50, 50],
+            [10, 10, 20, 30, 30, 20, 10, 10],
+            [5, 5, 10, 25, 25, 10, 5, 5],
+            [0, 0, 0, 20, 20, 0, 0, 0],
+            [5, -5, -10, 0, 0, -10, -5, 5],
+            [5, 10, 10, -20, -20, 10, 10, 5],
+            [0, 0, 0, 0, 0, 0, 0, 0]
+        ]
+        knight_ps_table = [
+            [-50, -40, -30, -30, -30, -30, -40, -50],
+            [-40, -20, 0, 0, 0, 0, -20, -40],
+            [-30, 0, 10, 15, 15, 10, 0, -30],
+            [-30, 5, 15, 20, 20, 15, 5, -30],
+            [-30, 0, 15, 20, 20, 15, 0, -30],
+            [-30, 5, 10, 15, 15, 10, 5, -30],
+            [-40, -20, 0, 5, 5, 0, -20, -40],
+            [-50, -40, -30, -30, -30, -30, -40, -50]
+        ]
+        bishop_ps_table = [
+            [-20, -10, -10, -10, -10, -10, -10, -20],
+            [-10, 0, 0, 0, 0, 0, 0, -10],
+            [-10, 0, 5, 10, 10, 5, 0, -10],
+            [-10, 5, 5, 10, 10, 5, 5, -10],
+            [-10, 0, 10, 10, 10, 10, 0, -10],
+            [-10, 10, 10, 10, 10, 10, 10, -10],
+            [-10, 5, 0, 0, 0, 0, 5, -10],
+            [-20, -10, -10, -10, -10, -10, -10, -20]
+        ]
+        rook_ps_table = [
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [5, 10, 10, 10, 10, 10, 10, 5],
+            [-5, 0, 0, 0, 0, 0, 0, -5],
+            [-5, 0, 0, 0, 0, 0, 0, -5],
+            [-5, 0, 0, 0, 0, 0, 0, -5],
+            [-5, 0, 0, 0, 0, 0, 0, -5],
+            [-5, 0, 0, 0, 0, 0, 0, -5],
+            [0, 0, 0, 5, 5, 0, 0, 0]
+        ]
+        queen_ps_table = [
+            [-20, -10, -10, -5, -5, -10, -10, -20],
+            [-10, 0, 0, 0, 0, 0, 0, -10],
+            [-10, 0, 5, 5, 5, 5, 0, -10],
+            [-5, 0, 5, 5, 5, 5, 0, -5],
+            [0, 0, 5, 5, 5, 5, 0, -5],
+            [-10, 5, 5, 5, 5, 5, 0, -10],
+            [-10, 0, 5, 0, 0, 0, 0, -10],
+            [-20, -10, -10, -5, -5, -10, -10, -20]
+        ]
+        king_ps_table = [
+            [-30, -40, -40, -50, -50, -40, -40, -30],
+            [-30, -40, -40, -50, -50, -40, -40, -30],
+            [-30, -40, -40, -50, -50, -40, -40, -30],
+            [-30, -40, -40, -50, -50, -40, -40, -30],
+            [-20, -30, -30, -40, -40, -30, -30, -20],
+            [-10, -20, -20, -20, -20, -20, -20, -10],
+            [20, 20, 0, 0, 0, 0, 20, 20],
+            [20, 30, 10, 0, 0, 10, 30, 20]
+        ]
+        piece_tables = {
+            "♙": pawn_ps_table,
+            "♘": knight_ps_table,
+            "♗": bishop_ps_table,
+            "♖": rook_ps_table,
+            "♕": queen_ps_table,
+            "♔": king_ps_table,
+            "♟": [[-score for score in row] for row in pawn_ps_table[::-1]],
+            "♞": [[-score for score in row] for row in knight_ps_table[::-1]],
+            "♝": [[-score for score in row] for row in bishop_ps_table[::-1]],
+            "♜": [[-score for score in row] for row in rook_ps_table[::-1]],
+            "♛": [[-score for score in row] for row in queen_ps_table[::-1]],
+            "♚": [[-score for score in row] for row in king_ps_table[::-1]],
+        }
         piece_score = 0
-        for row in self.state.board:
-            for piece in row:
-                piece_score += values[piece]
-        return piece_score
+        pstables_score = 0
+        mobility_score = 0
+        for row_i, row in enumerate(self.state.board):
+            for col_i, piece in enumerate(row):
+                if piece == "":
+                    continue
+                piece_score += material_scores[piece]
+                pstables_score += piece_tables[piece][row_i][col_i]
+        mobility_score += len(self.checkmate_yet(True, True)) - len(self.checkmate_yet(False, True))
+        return piece_score + pstables_score + (mobility_score*2)
     
     def ai(self) -> None:
-        # Extremely greedy...
         state: GameState = self.state
         if state.game_over:
             return
@@ -399,6 +479,9 @@ class ChessGame:
             piece_to_move, target_piece = state.board[row1][col1], state.board[row2][col2]
             state.board[row2][col2], state.board[row1][col1] = piece_to_move, ""
             score: int = self.score_board()
+            if target_piece != "":
+                material_scores: dict[str, int] = { "♙": 100, "♟": -100, "♘": 320, "♞": -320, "♗": 330, "♝": -330, "♖": 500, "♜": -500, "♕": 900, "♛": -900, "♔": 0, "♚": 0 }
+                score += (abs(material_scores[piece_to_move]) - abs(material_scores[target_piece]))
             state.board[row1][col1], state.board[row2][col2] = piece_to_move, target_piece
             if (score > best_score if state.white_turn else score < best_score):
                 best_score, best_move = score, move
