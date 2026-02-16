@@ -512,12 +512,13 @@ class ChessGame:
                 break
         state.transposition_table[key] = (depth, best_move, best_score)
         return (best_move, best_score)
-    
+        
     def ai(self) -> None:
         state: GameState = self.state
         if state.game_over:
             return
-        (row1, col1), (row2, col2), promotion_piece = self.negamax((4 if state.white_turn else 4))[0]
+        #(row1, col1), (row2, col2), promotion_piece = self.negamax((4 if state.white_turn else 4))[0]
+        (row1, col1), (row2, col2), promotion_piece = self.negamax((min(6, 3 + (8000 - sum(abs(state.material_scores[piece]) for row in state.board for piece in row if piece not in "♔♚")) // 2000)))[0]
         if promotion_piece != None:
             self.state.board[row1][col1] = promotion_piece
         self.animate(row1, col1, row2, col2)
