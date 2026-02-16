@@ -517,7 +517,7 @@ class ChessGame:
         state: GameState = self.state
         if state.game_over:
             return
-        (row1, col1), (row2, col2), promotion_piece = self.negamax((1 if state.white_turn else 4))[0]
+        (row1, col1), (row2, col2), promotion_piece = self.negamax((4 if state.white_turn else 4))[0]
         if promotion_piece != None:
             self.state.board[row1][col1] = promotion_piece
         self.animate(row1, col1, row2, col2)
@@ -629,7 +629,7 @@ class ChessGame:
         message.goto(0, 0)
         message.write(msg, align="center", font=("Arial", (font_size if font_size != None else int(sizes(True) * 0.35)), "bold"))
         if self.ai_active:
-            self.window.ontimer(lambda: self.close_message(0, 0), 1500)
+            self.window.ontimer(lambda: self.close_message(0, 0), 3000)
         else:
             self.window.onclick(self.close_message)
         
@@ -656,20 +656,21 @@ class ChessGame:
         state.history[self.get_position_state()] = state.history.get(self.get_position_state(), 0) + 1
         if self.in_check(state.white_turn):
             if self.checkmate_yet(state.white_turn):
-                show_message("Checkmate by " + ("Black" if state.white_turn else "White") + "!")
                 state.game_over = True
+                show_message("Checkmate by " + ("Black" if state.white_turn else "White") + "!")
             else:
                 show_message("Check!")
         elif state.halfmoves > 99:
+            state.game_over = True
             show_message("Draw: 50-move rule")
-            state.game_over = True
         elif state.history[self.get_position_state()] > 2:
-            show_message("Draw: 3-fold repetition")
             state.game_over = True
+            show_message("Draw: 3-fold repetition")
         else:
             if self.checkmate_yet(state.white_turn):
-                show_message("Stalemate!")
                 state.game_over = True
+                show_message("Stalemate!")
+                
 
     def move_pieces(self, x: float, y: float) -> None:
         state: GameState = self.state
@@ -677,13 +678,24 @@ class ChessGame:
         if state.game_over:
             return
         """
-        # AI against AI - can config which side has better depth analysis on line 528.
+        # AI against AI - can config which side has better depth analysis on line 520.
+        # This will not slow the speed down, but the messages may not display, or may display and instantly disappear
+        while not state.game_over:
+            self.ai()
+        return
+        #"""
+
+        """
+        # To show the messages properly, the speed is slowed down.
+        def ai_vs_ai(self):
+            if self.state.game_over:
+                return
+            self.ai()
+            self.window.ontimer(lambda: ai_vs_ai(self), 1000)
+
         if self.ai_active:
-            for i in range(1000):
-                if state.game_over:
-                    return None
-                else:
-                    self.ai()
+            self.window.ontimer(lambda: ai_vs_ai(self), 1000)
+        return
         #"""
         row, col = coord_to_cell(x, y)
         if row == None:
@@ -707,8 +719,9 @@ class ChessGame:
             else:
                 state.selected = []
         self.draw_board()
-        if run_ai:
+        if run_ai and not state.game_over:
             self.ai()
+            state.selected = []
         if len(state.selected) == 1:
             self.show_moves()
 
@@ -720,6 +733,6 @@ if __name__ == "__main__":
     window.title("Chess")
     window.getcanvas().winfo_toplevel().minsize(500, 500)
 
-    chess_game: ChessGame = ChessGame(window, window.textinput("AI", "Would you like an AI to play as black? (y/n)"))
+    chess_game: ChessGame = ChessGame(window, window.textinput("Chess AI", "Would you like an AI to play as black? (y/n)"))
 
     turtle.done()
