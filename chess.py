@@ -1,28 +1,6 @@
 # The aim of this project is to create a chess program using only turtle. Therefore, only turtle is imported here.
 import turtle
 
-def sizes(get_cell_size: bool=False, get_square_size:bool=False, get_smallest:bool=False) -> float:
-    smallest: float = min(window.window_width(), window.window_height())
-    if get_smallest:
-        return smallest
-    elif get_square_size:
-        return smallest * 0.9
-    elif get_cell_size:
-        return sizes(False, True) / 8
-
-# These random fractions are from testing, so I have no idea why it works. It just does.
-def cell_to_coord(row: int, col: int) -> tuple[float, float]:
-    x: float = -sizes(False, True)/2 + col*sizes(True) + sizes(True)/8
-    y: float = -sizes(False, True)/2 - sizes(False, False, True)/8 + (8-row)*sizes(True)
-    return x, y
-
-def coord_to_cell(x: float, y: float) -> tuple[int | None, int | None]:
-    col: int = int((x + sizes(False, True) / 2) // sizes(True))
-    row: int = int((y + sizes(False, True) / 2 - sizes(False, False, True)/10 + sizes(True)) // sizes(True))
-    if 0 <= row and 0 <= col < 8:
-        return row, col
-    return None, None
-
 # My version of the base 64 function which does not bother with padding.
 def base64(data: str, encode: bool=True) -> str:
     alphabet: str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
@@ -172,6 +150,9 @@ class ChessGame:
     def __init__(self, window: turtle.Screen, ai_active: str) -> None:
         self.window: turtle.Screen = window
         self.ai_active: bool = (True if ai_active == "y" else False)
+        self.ai_black: bool | None = None
+        if self.ai_active:
+            self.ai_black = (False if window.textinput("Chess AI", "What colour would you like to play as? (w/b)") == "b" else True)
         # t because I didn't have the foresight to see that I needed another 2 turtles for animation and messages and I can't be bothered to change it now
         t = self.t = turtle.Turtle()
         t.hideturtle()
@@ -186,18 +167,45 @@ class ChessGame:
         message.speed(0)
 
         self.state = GameState()
-
         self.window.onclick(self.move_pieces)
-        self.events()
-
-        self.draw_board()
-        self.show_message("i - Import game.\ne - Export game")
-
-    def events(self) -> None:
         self.window.getcanvas().bind("<Configure>", self.draw_board)
         self.window.onkey(lambda: self.game_data(False), "i")
         self.window.onkey(lambda: self.game_data(), "e")
         self.window.listen()
+
+        self.draw_board()
+        self.show_message("i - Import game.\ne - Export game")
+
+        if self.ai_active and not self.ai_black:
+            self.ai()
+
+    def flip_board(self):
+        return ((True if self.ai_black else False) if self.ai_active else self.state.white_turn)
+
+    def sizes(self, get_cell_size: bool=False, get_square_size:bool=False, get_smallest:bool=False) -> float:
+        if get_smallest:
+            return min(window.window_width(), window.window_height())
+        elif get_square_size:
+            return min(window.window_width(), window.window_height()) * 0.9
+        elif get_cell_size:
+            return self.sizes(False, True) / 8
+
+    # These random fractions are from testing, so I have no idea why it works. It just does.
+    def cell_to_coord(self, row: int, col: int) -> tuple[float, float]:
+        sizes = self.sizes
+        row, col = (row if self.flip_board() else 7-row), (col if self.flip_board() else 7-col)
+        x: float = -sizes(False, True)/2 + col*sizes(True) + sizes(True)/8
+        y: float = -sizes(False, True)/2 - sizes(False, False, True)/8 + (8-row)*sizes(True)
+        return x, y
+
+    def coord_to_cell(self, x: float, y: float) -> tuple[int | None, int | None]:
+        sizes = self.sizes
+        col: int = int((x + sizes(False, True) / 2) // sizes(True))
+        row: int = int((y + sizes(False, True) / 2 - sizes(False, False, True)/10 + sizes(True)) // sizes(True))
+        if 0 <= row and 0 <= col < 8:
+            return (row if self.flip_board() else 7-row), (col if self.flip_board() else 7-col)
+        return None, None
+
 
     def get_position_state(self) -> tuple[tuple[tuple[str] | bool] | bool]:
         state: GameState = self.state
@@ -379,13 +387,14 @@ class ChessGame:
         if (current_player_piece == "♙" and row2 == 0) or (current_player_piece == "♟" and row2 == 7):
             state.promotion_square = (row2, col2)
             options: list[str] = (["♕", "♖", "♗", "♘"] if row2 == 0 else ["♛", "♜", "♝", "♞"])
-            self.show_message("Promote to:\n1: Queen   2: Rook   3: Bishop   4: Knight\nEnter the number of your choice.", int(sizes(True)//6))
+            self.show_message("Promote to:\n1: Queen   2: Rook   3: Bishop   4: Knight\nEnter the number of your choice.", int(self.sizes(True)//6), False)
             self.window.onkey(lambda: self.promote(options[0]), "1")
             self.window.onkey(lambda: self.promote(options[1]), "2")
             self.window.onkey(lambda: self.promote(options[2]), "3")
             self.window.onkey(lambda: self.promote(options[3]), "4")
             self.window.update()
             self.window.listen()
+
 
 
 
@@ -421,7 +430,7 @@ class ChessGame:
                 if (piece == "") or (white and piece not in state.white_pieces) or (not white and piece not in state.black_pieces):
                     continue
                 
-                if piece in state.piece_type["pawns"]:
+                elif piece in state.piece_type["pawns"]:
                     direction: int =  (-1 if piece == "♙" else 1)
                     for jump in (1, 2):
                         row2: int = row1 + jump * direction
@@ -458,7 +467,6 @@ class ChessGame:
                 else:
                     pieces: list[str] = (state.piece_type["bishops"] + state.piece_type["rooks"] + state.piece_type["queens"])
                     valid_movements: list[list[tuple[int]]] = [(a:=[(-1,-1), (-1,1), (1,1), (1,-1)]), (b:=[(-1, 0), (0, 1), (0, -1), (1, 0)]), (a+b)]
-
                     for dy, dx in valid_movements[pieces.index(piece) // 2]:
                         row2, col2 = row1 + dy, col1 + dx
                         while 0 <= row2 < 8 and 0 <= col2 < 8:
@@ -532,7 +540,7 @@ class ChessGame:
 
 
     def draw_board(self, event=None) -> None:
-        t, state = self.t, self.state
+        t, state, sizes = self.t, self.state, self.sizes
         self.window.tracer(0, 0)
         t.clear()
         x: float = -sizes(False, True) / 2
@@ -552,7 +560,8 @@ class ChessGame:
                     t.forward(sizes(True))
                     t.right(90)
                 t.end_fill()
-                if (7-i, j) in state.selected:
+                piece_coords = (7-i if self.flip_board() else i), (j if self.flip_board() else 7-j)
+                if piece_coords in state.selected:
                     t.penup()
                     t.goto(x + j*sizes(True), y + i*sizes(True))
                     t.pendown()
@@ -562,13 +571,13 @@ class ChessGame:
                         t.forward(sizes(True))
                         t.right(90)
                     t.end_fill()
-                piece: str = state.board[7-i][j]
+                piece: str = state.board[piece_coords[0]][piece_coords[1]]
                 t.penup()
                 # again, these magic numbers were from testing
                 t.goto(x + j*sizes(True) + sizes(True)/8, y + i*sizes(True) - sizes(True))
                 t.write(piece, font=("Arial", int(sizes(True)*0.6)))
         if state.message != None:
-            self.show_message(state.message[0], state.message[1])
+            self.show_message(state.message[0], state.message[1], state.message[2])
         self.window.update()
 
     def promote(self, piece: str) -> None:
@@ -595,7 +604,7 @@ class ChessGame:
         current_player_piece: str = state.board[row1][col1]
         if current_player_piece in state.piece_type["kings"] and abs(col2 - col1) == 2:
             self.animate(row1, (7 if col1 < col2 else 0), row2, (col2 + (-1 if col1 < col2 else 1)))
-        state.board[row1][col1], state.board[row2][col2], (x1, y1), (x2, y2) = "", "", cell_to_coord(row1, col1), cell_to_coord(row2, col2)
+        state.board[row1][col1], state.board[row2][col2], (x1, y1), (x2, y2) = "", "", self.cell_to_coord(row1, col1), self.cell_to_coord(row2, col2)
         dy: float = ((y2 - y1) / 75)
         dx: float = ((x2 - x1) / 75)
         self.draw_board()
@@ -605,7 +614,7 @@ class ChessGame:
         for frame in range(75):
             animation.clear()
             animation.goto(x1 + dx*frame, y1 + dy*frame)
-            animation.write(current_player_piece, font=("Arial", int(sizes(True)*0.6)))
+            animation.write(current_player_piece, font=("Arial", int(self.sizes(True)*0.6)))
             self.window.update()
             # iteration of nothing is for the pause (as this project will only use turtle module). it also blocks, so that the next part cannot run, which is good.
             for iteration_of_nothing in range(100000):
@@ -613,9 +622,10 @@ class ChessGame:
         self.special_cases(current_player_piece, row1, col1, row2, col2)
         animation.clear()
 
-    def show_message(self, msg: str, font_size: int | None=None) -> None:
+    def show_message(self, msg: str, font_size: int | None=None, auto_close: bool=True) -> None:
+        sizes = self.sizes
         message: turtle.Turtle = self.message
-        self.state.message = (msg, font_size)
+        self.state.message = (msg, font_size, auto_close)
         message.color("red", "lightblue")
         message.goto(-sizes(False, True) * 0.3, -sizes(False, True) * 0.075)
         message.pendown()
@@ -629,10 +639,8 @@ class ChessGame:
         message.penup()
         message.goto(0, 0)
         message.write(msg, align="center", font=("Arial", (font_size if font_size != None else int(sizes(True) * 0.35)), "bold"))
-        if self.ai_active:
-            self.window.ontimer(lambda: self.close_message(0, 0), 3000)
-        else:
-            self.window.onclick(self.close_message)
+        if auto_close:
+            self.window.ontimer(lambda: self.close_message(0, 0), 2000)
         
     def close_message(self, x: float, y: float) -> None:
         self.state.message = None
@@ -640,12 +648,12 @@ class ChessGame:
         self.window.onclick(self.move_pieces)
 
     def show_moves(self) -> None:
-        t: turtle.Turtle = self.t
+        t, sizes = self.t, self.sizes
         row1, col1 = self.state.selected[0]
         for row in range(8):
             for col in range(8):
                 if self.valid_move((row1, col1), (row, col)):
-                    x, y = cell_to_coord(row, col)
+                    x, y = self.cell_to_coord(row, col)
                     t.goto(x + (2*sizes(True))/5, y + sizes(True)/2)
                     t.pendown()
                     t.dot(int(sizes(True) * 0.2), "green")
@@ -698,7 +706,7 @@ class ChessGame:
             self.window.ontimer(lambda: ai_vs_ai(self), 1000)
         return
         #"""
-        row, col = coord_to_cell(x, y)
+        row, col = self.coord_to_cell(x, y)
         if row == None:
             return
         if self.check_turn(7-row, col):
@@ -734,6 +742,6 @@ if __name__ == "__main__":
     window.title("Chess")
     window.getcanvas().winfo_toplevel().minsize(500, 500)
 
-    chess_game: ChessGame = ChessGame(window, window.textinput("Chess AI", "Would you like an AI to play as black? (y/n)"))
+    chess_game: ChessGame = ChessGame(window, window.textinput("Chess AI", "Would you like to play against an AI? (y/n)"))
 
     turtle.done()
