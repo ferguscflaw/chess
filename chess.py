@@ -210,7 +210,7 @@ class ChessGame:
 
     def get_position_state(self) -> tuple[tuple[tuple[str] | bool] | bool]:
         state: GameState = self.state
-        return (tuple(tuple(row) for row in state.board), state.white_turn)
+        return (tuple(piece for row in state.board for piece in row), state.white_turn)
 
     def game_data(self, export: bool=True) -> None:
         state: GameState = self.state
@@ -287,7 +287,7 @@ class ChessGame:
                     return True
             return False
         else:
-            pieces: list[str] = (state.piece_type["bishops"] + state.piece_type["rooks"] + state.piece_type["queens"])
+            pieces: list[str] = ["♗", "♝", "♖", "♜", "♕", "♛"]
             valid_movements: list[bool] = [(a:=abs(dy)==abs(dx)), (b:=dy==0 or dx==0), (a or b)]
 
             if valid_movements[pieces.index(piece_to_move) // 2]:
@@ -321,22 +321,34 @@ class ChessGame:
         piece_to_move: str = state.board[row1][col1]
         target_piece: str = state.board[row2][col2]
         state.board[row2][col2], state.board[row1][col1] = state.board[row1][col1], ""
+        if piece_to_move in state.piece_type["kings"]:
+            state.king_coords[(0 if piece_to_move == "♔" else 1)] = (row2, col2)
         if self.in_check((state.board[row2][col2] in state.white_pieces)):
             state.board[row1][col1], state.board[row2][col2] = piece_to_move, target_piece
+            if piece_to_move in state.piece_type["kings"]:
+                state.king_coords[(0 if piece_to_move == "♔" else 1)] = (row1, col1)
             return False
         elif piece_to_move in state.piece_type["kings"] and abs(col2 - col1) == 2:
             state.board[row1][col1], state.board[row2][col2] = piece_to_move, target_piece
+            if piece_to_move in state.piece_type["kings"]:
+                state.king_coords[(0 if piece_to_move == "♔" else 1)] = (row1, col1)
             white: bool = (piece_to_move == "♔")
             direction: int = (1 if col2 > col1 else -1)
             col: int = col1
             while col != col2:
                 original_piece, state.board[row1][col1], state.board[row1][col] = state.board[row1][col], "", piece_to_move
+                if piece_to_move in state.piece_type["kings"]:
+                    state.king_coords[(0 if piece_to_move == "♔" else 1)] = (row2, col2)
                 if self.in_check(white):
                     state.board[row1][col], state.board[row1][col1], state.board[row2][col2] = original_piece, piece_to_move, target_piece
+                    if piece_to_move in state.piece_type["kings"]:
+                        state.king_coords[(0 if piece_to_move == "♔" else 1)] = (row1, col1)
                     return False
                 state.board[row1][col], state.board[row1][col1] = original_piece, piece_to_move
                 col += direction
         state.board[row1][col1], state.board[row2][col2] = piece_to_move, target_piece
+        if piece_to_move in state.piece_type["kings"]:
+            state.king_coords[(0 if piece_to_move == "♔" else 1)] = (row1, col1)
         return True
 
     def checkmate_yet(self, white: bool) -> bool:
@@ -426,12 +438,12 @@ class ChessGame:
                     direction: int =  (-1 if piece == "♙" else 1)
                     for jump in (1, 2):
                         row2: int = row1 + jump * direction
-                        if 0 <= row2 < 8 and ((jump == 1 and board[row2][col1] == "") or (jump == 2 and row1 in [6, 1] and board[row2][col1] == "" and board[row1 + direction][col1] == "")) and self.valid_move((row1, col1), (row2, col1)):
+                        if 0 <= row2 < 8 and ((jump == 1 and board[row2][col1] == "") or (jump == 2 and row1 in [6, 1] and board[row2][col1] == "" and board[row1 + direction][col1] == "")) and self.piece_move_valid((row1, col1), (row2, col1)):
                             for promotion_piece in (["♕", "♖", "♗", "♘"] if (piece == "♙" and row2 == 0) else (["♛", "♜", "♝", "♞"] if (piece == "♟" and row2 == 7) else [None])):
                                 moves.append(((row1, col1), (row2, col1), promotion_piece))
                     for side in (-1, 1):
                         row2, col2 = row1 + direction, col1 + side
-                        if 0 <= row2 < 8 and 0 <= col2 < 8 and self.valid_move((row1, col1), (row2, col2)):
+                        if 0 <= row2 < 8 and 0 <= col2 < 8 and self.piece_move_valid((row1, col1), (row2, col2)):
                             for promotion_piece in (["♕", "♖", "♗", "♘"] if (piece == "♙" and row2 == 0) else (["♛", "♜", "♝", "♞"] if (piece == "♟" and row2 == 7) else [None])):
                                 moves.append(((row1, col1), (row2, col2), promotion_piece))
                         if (row2, col2) == state.en_passent_target:
@@ -440,7 +452,7 @@ class ChessGame:
                 elif piece in state.piece_type["knights"]:
                     for dy, dx in [(-2, -1), (-2, 1), (2, -1), (2, 1), (-1, -2), (-1, 2), (1, -2), (1, 2)]:
                         row2, col2 = row1 + dy, col1 + dx
-                        if 0 <= row2 < 8 and 0 <= col2 < 8 and self.valid_move((row1, col1), (row2, col2)):
+                        if 0 <= row2 < 8 and 0 <= col2 < 8 and self.piece_move_valid((row1, col1), (row2, col2)):
                             moves.append(((row1, col1), (row2, col2), None))
 
                 elif piece in state.piece_type["kings"]:
@@ -449,11 +461,11 @@ class ChessGame:
                             if dy == 0 and dx == 0:
                                 continue
                             row2, col2 = row1 + dy, col1 + dx
-                            if 0 <= row2 < 8 and 0 <= col2 < 8 and self.valid_move((row1, col1), (row2, col2)):
+                            if 0 <= row2 < 8 and 0 <= col2 < 8 and self.piece_move_valid((row1, col1), (row2, col2)):
                                 moves.append(((row1, col1), (row2, col2), None))
                     for dx in (-2, 2):
                         col2 = col1 + dx
-                        if 0 <= col2 < 8 and self.valid_move((row1, col1), (row1, col2)):
+                        if 0 <= col2 < 8 and self.piece_move_valid((row1, col1), (row1, col2)):
                             moves.append(((row1, col1), (row1, col2), None))
 
                 else:
@@ -462,7 +474,7 @@ class ChessGame:
                     for dy, dx in valid_movements[pieces.index(piece) // 2]:
                         row2, col2 = row1 + dy, col1 + dx
                         while 0 <= row2 < 8 and 0 <= col2 < 8:
-                            if self.valid_move((row1, col1), (row2, col2)):
+                            if self.piece_move_valid((row1, col1), (row2, col2)):
                                 moves.append(((row1, col1), (row2, col2), None))
                             if board[row2][col2] != "":
                                 break
@@ -475,11 +487,25 @@ class ChessGame:
         state: GameState = self.state
         if depth == 0:
             return (None, (self.score_board() if state.white_turn else -self.score_board()))
-        key = (tuple(tuple(row) for row in state.board), state.white_turn, tuple(state.king_moved), tuple(state.rook_moved), state.en_passent_target)
+        key = (tuple(piece for row in state.board for piece in row), state.white_turn, tuple(state.king_moved), tuple(state.rook_moved), state.en_passent_target)
         if key in state.transposition_table:
             if state.transposition_table[key][0] >= depth:
                 return (state.transposition_table[key][1], state.transposition_table[key][2])
-        moves: list[tuple[tuple[int]]] = self.possible_moves(state.white_turn)
+        probably_possible_moves: list[tuple[tuple[int]]] = self.possible_moves(state.white_turn)
+        moves = []
+        for move in probably_possible_moves:
+            (row1, col1), (row2, col2), promotion_piece = move
+            if (state.board[row1][col1] in state.white_pieces and state.board[row2][col2] in state.white_pieces) or (state.board[row1][col1] in state.black_pieces and state.board[row2][col2] in state.black_pieces):
+                continue
+            piece_to_move, target_piece = state.board[row1][col1], state.board[row2][col2]
+            state.board[row2][col2], state.board[row1][col1] = state.board[row1][col1], ""
+            if piece_to_move in state.piece_type["kings"]:
+                state.king_coords[(0 if piece_to_move == "♔" else 1)] = (row2, col2)
+            if not self.in_check(state.white_turn):
+                moves.append(move)
+            state.board[row1][col1], state.board[row2][col2] = piece_to_move, target_piece
+            if piece_to_move in state.piece_type["kings"]:
+                state.king_coords[(0 if piece_to_move == "♔" else 1)] = (row1, col1)
         if len(moves) == 0:
             if self.in_check(state.white_turn):
                 return (None, -453421-depth)
@@ -490,9 +516,9 @@ class ChessGame:
         for move in moves:
             (row1, col1), (row2, col2), promotion_piece = move
             piece_to_move, target_piece = state.board[row1][col1], state.board[row2][col2]
-            if target_piece in state.piece_type["kings"]:
-                return (move, -452154)
             state.board[row1][col1], state.board[row2][col2] = "", (promotion_piece if promotion_piece else piece_to_move)
+            if piece_to_move in state.piece_type["kings"]:
+                state.king_coords[(0 if piece_to_move == "♔" else 1)] = (row2, col2)
             state.white_turn = not state.white_turn
             position_key = self.get_position_state()
             state.history[position_key] = state.history.get(position_key, 0) + 1
@@ -504,6 +530,8 @@ class ChessGame:
             if state.history[position_key] == 0:
                 del state.history[position_key]
             state.board[row1][col1], state.board[row2][col2] = piece_to_move, target_piece
+            if piece_to_move in state.piece_type["kings"]:
+                state.king_coords[(0 if piece_to_move == "♔" else 1)] = (row1, col1)
             state.white_turn = not state.white_turn
             if score > best_score:
                 best_move, best_score = move, score
@@ -514,18 +542,22 @@ class ChessGame:
         return (best_move, best_score)
         
     def ai(self) -> None:
+        import time
+        start_time = time.time()
         state: GameState = self.state
         if state.game_over:
             return
-        #(row1, col1), (row2, col2), promotion_piece = self.negamax((4 if state.white_turn else 4))[0]
+        (row1, col1), (row2, col2), promotion_piece = self.negamax((4 if state.white_turn else 4))[0]
         #(row1, col1), (row2, col2), promotion_piece = self.negamax((min(6, 3 + (8000 - sum(abs(state.material_scores[piece]) for row in state.board for piece in row if piece not in "♔♚")) // 2000)))[0]
-        (row1, col1), (row2, col2), promotion_piece = self.negamax(4)[0]
         if promotion_piece != None:
             self.state.board[row1][col1] = promotion_piece
+        if state.board[row1][col1] in state.piece_type["kings"]:
+            state.king_coords[(0 if state.board[row1][col1] == "♔" else 1)] = (row2, col2)
         self.animate(row1, col1, row2, col2)
         state.white_turn = not state.white_turn
         self.position_check()
         self.draw_board()
+        print(str(time.time() - start_time))
 
 
 
