@@ -20,6 +20,7 @@ class GameState:
         self.black_pieces: list[str] = ["♟", "♞", "♝", "♜", "♛", "♚"]
         self.king_moved: list[bool] = [False, False]
         self.rook_moved: list[bool] = [False, False, False, False]
+        self.king_castled: list[bool] = [False, False]
         self.king_coords: list[tuple[int, int]] = [(7, 4), (0, 4)]
         self.board: list[list[str]] = [
             ["♜","♞","♝","♛","♚","♝","♞","♜"],
@@ -118,6 +119,7 @@ class GameState:
             "♛": [[-score for score in row] for row in queen_ps_table[::-1]],
             "♚": [[-score for score in row] for row in king_ps_table[::-1]],
         }
+        self.current_score = 0
 
     # Convert row into a ripoff FEN notation and vice versa.
     def format_row(self, row: list[str], compress: bool=True) -> list[str] | str:
@@ -134,7 +136,7 @@ class GameState:
         return result
     
     def export(self) -> str:
-        return base64(("|".join(["/".join(self.format_row(row) for row in self.board), ("w" if self.white_turn else "b"), ("-" if self.en_passent_target is None else f"{self.en_passent_target[0]},{self.en_passent_target[1]}"), str(self.halfmoves), ("".join("1" if k else "0" for k in self.king_moved)), ("".join("1" if r else "0" for r in self.rook_moved))])))
+        return base64(("|".join(["/".join(self.format_row(row) for row in self.board), ("w" if self.white_turn else "b"), ("-" if self.en_passent_target is None else f"{self.en_passent_target[0]},{self.en_passent_target[1]}"), str(self.halfmoves), ("".join("1" if k else "0" for k in self.king_moved)), ("".join("1" if r else "0" for r in self.rook_moved)), ("/".join(str(self.king_castled)))])))
     
     def continue_game(self, data) -> None:
         data_sections = base64(data, False).split("|")
@@ -142,8 +144,9 @@ class GameState:
         self.white_turn = (data_sections[1] == "w")
         self.en_passent_target = None if data_sections[2] == "-" else tuple(map(int, data_sections[2].split(",")))
         self.halfmoves = int(data_sections[3])
-        self.king_moved = [c == "1" for c in data_sections[4]]
-        self.rook_moved = [c == "1" for c in data_sections[5]]
+        self.king_moved = [bit == "1" for bit in data_sections[4]]
+        self.rook_moved = [bit == "1" for bit in data_sections[5]]
+        self.king_castled = [(False if string == "False" else string) for string in data_sections[6].split("/")]
         self.game_over = False
 
 
@@ -222,6 +225,11 @@ class ChessGame:
                 state.continue_game(data)
                 self.draw_board()
                 self.position_check()
+                if self.ai_active:
+                    if not state.white_turn and self.ai_black:
+                        self.ai()
+                    if state.white_turn and not self.ai_black:
+                        self.ai()
             except:
                 self.show_message("Invalid code")
 
@@ -296,7 +304,7 @@ class ChessGame:
         board = state.board
 
         for dx in (-1, 1):
-            if 0 <= k_row - colour*3 + 1 < 8 and 0 <= k_col + dx < 8 and board[k_row - colour*3 + 1][k_col + dx] in [state.piece_type["pawns"][colour]]:
+            if 0 <= k_row - colour*2 + 1 < 8 and 0 <= k_col + dx < 8 and board[k_row - colour*2 + 1][k_col + dx] in [state.piece_type["pawns"][colour]]:
                 return True
             
         for dx, dy in [(-2, -1), (-2, 1), (-1, -2), (-1, 2), (1, -2), (1, 2), (2, -1), (2, 1)]:
@@ -304,8 +312,8 @@ class ChessGame:
                 return True
             
         for index, (dx, dy) in enumerate([(-1, -1), (-1, 1), (1, -1), (1, 1), (-1, 0), (1, 0), (0, -1), (0, 1)]):
-            row, col = k_row, k_col
-            while 0 <= row + dy < 8 and 0 <= col + dx < 8:
+            row, col = k_row+dy, k_col+dx
+            while 0 <= row < 8 and 0 <= col < 8:
                 piece = board[row][col]
                 if piece != "":
                     if (piece in [state.piece_type["bishops"][colour]] and index < 4) or (piece in [state.piece_type["rooks"][colour]] and index > 3) or piece in [state.piece_type["queens"][colour]]:
@@ -320,7 +328,7 @@ class ChessGame:
         state: GameState = self.state
         (row1, col1), (row2, col2) = origin, target
         if (state.board[row1][col1] in state.white_pieces and state.board[row2][col2] in state.white_pieces) or (state.board[row1][col1] in state.black_pieces and state.board[row2][col2] in state.black_pieces):
-                return False
+            return False
         
         if not self.piece_move_valid(origin, target):
             return False
@@ -422,13 +430,11 @@ class ChessGame:
                     continue
                 piece_score += state.material_scores[piece]
                 pstables_score += state.piece_tables[piece][row_i][col_i]
-        for rook, moved_yet in enumerate(state.rook_moved):
-            if moved_yet:
-                castling_score += (50 if rook // 2 == 0 else -50)
-        for king, moved_yet in enumerate(state.king_moved):
-            if moved_yet:
-                castling_score += (100 if king == 0 else -100)
-        return piece_score + pstables_score
+
+        castling_score += sum(((50 if rook // 2 == 0 else -50) if moved_yet else 0) for rook, moved_yet in enumerate(state.rook_moved))
+        castling_score += sum(((100 if king == 0 else -100) if moved_yet else 0) for king, moved_yet in enumerate(state.king_moved))
+        castling_score += sum(0 if castled == False else ((200 if castled == "k" else 150) if king == 0 else (-200 if castled == "k" else -150)) for king, castled in enumerate(state.king_castled))
+        return piece_score + pstables_score + castling_score
     
 
     def possible_moves(self, white: bool) -> list[tuple[tuple[int]]]:
@@ -497,7 +503,7 @@ class ChessGame:
         state: GameState = self.state
         king_coords = state.king_coords
         if depth == 0:
-            return (None, (self.score_board() if state.white_turn else -self.score_board()))
+            return (None, state.current_score if state.white_turn else -state.current_score)
         key = "".join(piece or "." for row in state.board for piece in row) + ("w" if state.white_turn else "b") + "".join(str(int(boolean) for boolean in state.king_moved)) + "".join(str(int(boolean) for boolean in state.rook_moved)) + (str(state.en_passent_target) if state.en_passent_target != None else "")
         if key in state.transposition_table:
             if state.transposition_table[key][0] >= depth:
@@ -528,6 +534,20 @@ class ChessGame:
             (row1, col1), (row2, col2), promotion_piece = move
             piece_to_move, target_piece = state.board[row1][col1], state.board[row2][col2]
             state.board[row1][col1], state.board[row2][col2] = "", (promotion_piece if promotion_piece else piece_to_move)
+
+            previous_score = state.current_score
+            state.current_score -= state.piece_tables[piece_to_move][row1][col1]
+            if target_piece != "":
+                state.current_score -= state.material_scores[target_piece] + state.piece_tables[target_piece][row2][col2]
+            state.current_score += state.piece_tables[(piece_to_move if promotion_piece == None else promotion_piece)][row2][col2]
+            if abs(col2-col1) == 2:
+                state.king_castled[(0 if piece_to_move == "♔" else 1)] = ("k" if col2-col1 == 2 else "q")
+            state.current_score += ((200 if col2-col1 == 2 else (150 if col2-col1 == -2 else 0)) if piece_to_move == "♔" else ((-200 if col2-col1 == 2 else (-150 if col2-col1 == -2 else 0)) if piece_to_move in state.piece_type["kings"] else 0))
+            for rook, moved_yet in enumerate(state.rook_moved):
+                state.current_score += ((45 if rook // 2 == 0 else -45) if moved_yet else 0)
+            for king, moved_yet in enumerate(state.king_moved):
+                state.current_score += ((75 if king == 0 else -75) if moved_yet else 0)
+
             if piece_to_move in state.piece_type["kings"]:
                 king_coords[(0 if piece_to_move == "♔" else 1)] = (row2, col2)
             state.white_turn = not state.white_turn
@@ -537,10 +557,13 @@ class ChessGame:
                 score: int = 0
             else:
                 score: int = -(self.negamax(depth-1, -beta, -alpha)[1])
+
             state.history[position_key] -= 1
             if state.history[position_key] == 0:
                 del state.history[position_key]
             state.board[row1][col1], state.board[row2][col2] = piece_to_move, target_piece
+            state.current_score = previous_score
+
             if piece_to_move in state.piece_type["kings"]:
                 king_coords[(0 if piece_to_move == "♔" else 1)] = (row1, col1)
             state.white_turn = not state.white_turn
@@ -558,9 +581,9 @@ class ChessGame:
         state: GameState = self.state
         if state.game_over:
             return
-        #(row1, col1), (row2, col2), promotion_piece = self.negamax((4 if state.white_turn else 4))[0]
+        state.current_score = self.score_board()
+        (row1, col1), (row2, col2), promotion_piece = self.negamax((4 if state.white_turn else 4))[0]
         #(row1, col1), (row2, col2), promotion_piece = self.negamax((min(6, 3 + (8000 - sum(abs(state.material_scores[piece]) for row in state.board for piece in row if piece not in "♔♚")) // 2000)))[0]
-        (row1, col1), (row2, col2), promotion_piece = self.negamax(4)[0]
         if promotion_piece != None:
             self.state.board[row1][col1] = promotion_piece
         if state.board[row1][col1] in state.piece_type["kings"]:
@@ -640,6 +663,7 @@ class ChessGame:
         animation: turtle.Turtle = self.animation
         current_player_piece: str = state.board[row1][col1]
         if current_player_piece in state.piece_type["kings"] and abs(col2 - col1) == 2:
+            state.king_castled[int(not state.white_turn)] = ("k" if col2 - col1 == 2 else "q")
             self.animate(row1, (7 if col1 < col2 else 0), row2, (col2 + (-1 if col1 < col2 else 1)))
         state.board[row1][col1], state.board[row2][col2], (x1, y1), (x2, y2) = "", "", self.cell_to_coord(row1, col1), self.cell_to_coord(row2, col2)
         dy: float = ((y2 - y1) / 75)
