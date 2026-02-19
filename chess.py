@@ -20,6 +20,7 @@ class GameState:
         self.black_pieces: list[str] = ["♟", "♞", "♝", "♜", "♛", "♚"]
         self.king_moved: list[bool] = [False, False]
         self.rook_moved: list[bool] = [False, False, False, False]
+        self.king_coords: list[tuple[int, int]] = [(7, 4), (0, 4)]
         self.board: list[list[str]] = [
             ["♜","♞","♝","♛","♚","♝","♞","♜"],
             ["♟","♟","♟","♟","♟","♟","♟","♟"],
@@ -293,18 +294,8 @@ class ChessGame:
                 return self.gonna_crash(row1, col1, row2, col2)
             return False
 
-    # TODO: Store king location instead of finding it.
     def in_check(self, white: bool) -> bool:
         state: GameState = self.state
-        king: tuple[int, int] | str = ("♔" if white else "♚")
-        for row in range(8):
-            for col in range(8):
-                if state.board[row][col] == king:
-                    king = (row, col)
-                    break
-            if king not in state.piece_type["kings"]:
-                break
-        # Now do a very inefficient method of going through every square to see if king is attacked.
         for row in range(8):
             for col in range(8):
                 piece_to_check: str = state.board[row][col]
@@ -314,7 +305,7 @@ class ChessGame:
                     continue
                 elif not white and piece_to_check in state.black_pieces:
                     continue
-                if self.piece_move_valid((row, col), king):
+                if self.piece_move_valid((row, col), state.king_coords[(0 if white else 1)]):
                     return True
         return False
 
@@ -379,6 +370,7 @@ class ChessGame:
 
         if current_player_piece in state.piece_type["kings"]:
             state.king_moved[(0 if current_player_piece == "♔" else 1)] = True
+            state.king_coords[(0 if current_player_piece == "♔" else 1)] = (row2, col2)
         elif current_player_piece in state.piece_type["rooks"] and ((row1 == 7 if current_player_piece == "♖" else row1 == 0) and (col1 == 0  or col1 == 7)):
             state.rook_moved[((0 if current_player_piece == "♖" else 2) + (0 if col1 == 0 else 1))] = True
 
@@ -526,7 +518,8 @@ class ChessGame:
         if state.game_over:
             return
         #(row1, col1), (row2, col2), promotion_piece = self.negamax((4 if state.white_turn else 4))[0]
-        (row1, col1), (row2, col2), promotion_piece = self.negamax((min(6, 3 + (8000 - sum(abs(state.material_scores[piece]) for row in state.board for piece in row if piece not in "♔♚")) // 2000)))[0]
+        #(row1, col1), (row2, col2), promotion_piece = self.negamax((min(6, 3 + (8000 - sum(abs(state.material_scores[piece]) for row in state.board for piece in row if piece not in "♔♚")) // 2000)))[0]
+        (row1, col1), (row2, col2), promotion_piece = self.negamax(4)[0]
         if promotion_piece != None:
             self.state.board[row1][col1] = promotion_piece
         self.animate(row1, col1, row2, col2)
