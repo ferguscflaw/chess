@@ -296,17 +296,29 @@ class ChessGame:
 
     def in_check(self, white: bool) -> bool:
         state: GameState = self.state
-        for row in range(8):
-            for col in range(8):
-                piece_to_check: str = state.board[row][col]
-                if piece_to_check == "":
-                    continue
-                elif white and piece_to_check in state.white_pieces:
-                    continue
-                elif not white and piece_to_check in state.black_pieces:
-                    continue
-                if self.piece_move_valid((row, col), state.king_coords[(0 if white else 1)]):
-                    return True
+        colour = (1 if white else 0)
+        k_row, k_col = state.king_coords[-colour+1]
+        board = state.board
+
+        for dx in (-1, 1):
+            if 0 <= k_row - colour*3 + 1 < 8 and 0 <= k_col + dx < 8 and board[k_row - colour*3 + 1][k_col + dx] in [state.piece_type["pawns"][colour]]:
+                return True
+            
+        for dx, dy in [(-2, -1), (-2, 1), (-1, -2), (-1, 2), (1, -2), (1, 2), (2, -1), (2, 1)]:
+            if 0 <= k_row + dy < 8 and 0 <= k_col + dx < 8 and board[k_row + dy][k_col + dx] in [state.piece_type["knights"][colour]]:
+                return True
+            
+        for index, (dx, dy) in enumerate([(-1, -1), (-1, 1), (1, -1), (1, 1), (-1, 0), (1, 0), (0, -1), (0, 1)]):
+            row, col = k_row, k_col
+            while 0 <= row + dy < 8 and 0 <= col + dx < 8:
+                piece = board[row][col]
+                if piece != "":
+                    if (piece in [state.piece_type["bishops"][colour]] and index < 4) or (piece in [state.piece_type["rooks"][colour]] and index > 3) or piece in [state.piece_type["queens"][colour]]:
+                        return True
+                    break
+                row += dy
+                col += dx
+        
         return False
 
     def valid_move(self, origin: tuple[int, int], target: tuple[int, int]) -> bool:
