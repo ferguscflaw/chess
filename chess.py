@@ -120,7 +120,7 @@ class GameState:
             "♚": [[-score for score in row] for row in king_ps_table[::-1]],
         }
         self.knight_moves = [(-2, -1), (-2, 1), (-1, -2), (-1, 2), (1, -2), (1, 2), (2, -1), (2, 1)]
-        self.enumerated_brq_moves = enumerate([(-1, -1), (-1, 1), (1, -1), (1, 1), (-1, 0), (1, 0), (0, -1), (0, 1)])
+        self.enumerated_brq_moves = list(enumerate([(-1, -1), (-1, 1), (1, -1), (1, 1), (-1, 0), (1, 0), (0, -1), (0, 1)]))
         self.current_score = 0
 
     # Convert row into a ripoff FEN notation and vice versa.
