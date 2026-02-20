@@ -262,19 +262,17 @@ class ChessGame:
         (row1, col1), (row2, col2) = origin, target
         dy: int = (row2 - row1)
         dx: int = (col2 - col1)
-        piece_to_move: str = state.board[row1][col1]
-        target_piece: str = state.board[row2][col2]
+        board = state.board
+        piece_to_move: str = board[row1][col1]
+        target_piece: str = board[row2][col2]
         
         if piece_to_move in state.piece_type["pawns"]:
             white_pawn: bool = (piece_to_move == "♙")
-            if dx == 0 and target_piece == "":
-                if (dy == -1 if white_pawn else dy == 1):
-                    return True
-                elif (row1 == 6 if white_pawn else row1 == 1) and (dy == -2 if white_pawn else dy == 2) and (state.board[row1-1][col1] == "" if white_pawn else state.board[row1+1][col1] == ""):
-                    return True
-            elif abs(dx) == 1 and (dy == -1 if white_pawn else dy == 1):
-                if (target_piece in state.black_pieces if white_pawn else target_piece in state.white_pieces) or (state.en_passent_target == (row2, col2)):
-                    return True
+            direction_y = (-1 if white_pawn else 1)
+            if dx == 0 and target_piece == "" and (dy == direction_y or (dy == direction_y*2 and board[row1+direction_y][col1] == "" and row1 << 1 == 7-5*direction_y)):
+                return True
+            elif abs(dx) == 1 and dy == direction_y and (target_piece != "" or state.en_passent_target == (row2, col2)):
+                return True
             return False
 
         elif piece_to_move in state.piece_type["knights"]:
@@ -287,7 +285,7 @@ class ChessGame:
                 white_king: bool = (piece_to_move == "♔")
                 if not state.king_moved[(0 if white_king else 1)]:
                     kingside: bool = (dx == 2)
-                    if (state.rook_moved[((1 if kingside else 0) + (0 if white_king else 2))]) or (state.board[(7 if white_king else 0)][(7 if kingside else 0)] not in ["♖", "♜"]) or (state.board[row1][(5 if kingside else 1)] != "" or (state.board[row1][6] != "" if kingside else (state.board[row1][2] != "" or state.board[row1][3] != ""))):
+                    if (state.rook_moved[((1 if kingside else 0) + (0 if white_king else 2))]) or (board[(7 if white_king else 0)][(7 if kingside else 0)] not in ["♖", "♜"]) or (board[row1][(5 if kingside else 1)] != "" or (board[row1][6] != "" if kingside else (board[row1][2] != "" or board[row1][3] != ""))):
                         return False
                     return True
             return False
@@ -502,6 +500,7 @@ class ChessGame:
                                 break
                             row2 += dy
                             col2 += dx
+
         return moves
 
 
@@ -582,13 +581,14 @@ class ChessGame:
         return (best_move, best_score)
         
     def ai(self) -> None:
-        import time
-        start_time = time.time()
         state: GameState = self.state
         if state.game_over:
             return
         state.current_score = self.score_board()
+        import time
+        start_time = time.time()
         (row1, col1), (row2, col2), promotion_piece = self.negamax(4)[0]
+        print(time.time()-start_time)
         #(row1, col1), (row2, col2), promotion_piece = self.negamax((4 if state.white_turn else 4))[0]
         #(row1, col1), (row2, col2), promotion_piece = self.negamax((min(6, 3 + (8000 - sum(abs(state.material_scores[piece]) for row in state.board for piece in row if piece not in "♔♚")) // 2000)))[0]
         if promotion_piece != None:
@@ -599,7 +599,6 @@ class ChessGame:
         state.white_turn = not state.white_turn
         self.position_check()
         self.draw_board()
-        print(time.time()-start_time)
 
 
 
