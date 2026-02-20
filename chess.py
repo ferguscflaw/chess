@@ -119,6 +119,8 @@ class GameState:
             "♛": [[-score for score in row] for row in queen_ps_table[::-1]],
             "♚": [[-score for score in row] for row in king_ps_table[::-1]],
         }
+        self.knight_moves = [(-2, -1), (-2, 1), (-1, -2), (-1, 2), (1, -2), (1, 2), (2, -1), (2, 1)]
+        self.enumerated_brq_moves = enumerate([(-1, -1), (-1, 1), (1, -1), (1, 1), (-1, 0), (1, 0), (0, -1), (0, 1)])
         self.current_score = 0
 
     # Convert row into a ripoff FEN notation and vice versa.
@@ -300,23 +302,27 @@ class ChessGame:
     def in_check(self, white: bool) -> bool:
         state: GameState = self.state
         colour = (1 if white else 0)
-        k_row, k_col = state.king_coords[-colour+1]
+        k_row, k_col = state.king_coords[1-colour]
         board = state.board
+        piece_type = state.piece_type
 
+        pawn = piece_type["pawns"][colour]
         for dx in (-1, 1):
-            if 0 <= k_row - colour*2 + 1 < 8 and 0 <= k_col + dx < 8 and board[k_row - colour*2 + 1][k_col + dx] in [state.piece_type["pawns"][colour]]:
+            if 0 <= (row:=k_row-colour*2+1) < 8 and 0 <= (col:=k_col+dx) < 8 and board[row][col] == pawn:
                 return True
             
-        for dx, dy in [(-2, -1), (-2, 1), (-1, -2), (-1, 2), (1, -2), (1, 2), (2, -1), (2, 1)]:
-            if 0 <= k_row + dy < 8 and 0 <= k_col + dx < 8 and board[k_row + dy][k_col + dx] in [state.piece_type["knights"][colour]]:
+        knight = piece_type["knights"][colour]
+        for dx, dy in state.knight_moves:
+            if 0 <= (row:=k_row+dy) < 8 and 0 <= (col:=k_col+dx) < 8 and board[row][col] == knight:
                 return True
-            
-        for index, (dx, dy) in enumerate([(-1, -1), (-1, 1), (1, -1), (1, 1), (-1, 0), (1, 0), (0, -1), (0, 1)]):
+
+        bishop, rook, queen = piece_type["bishops"][colour], piece_type["rooks"][colour], piece_type["queens"][colour]
+        for index, (dx, dy) in state.enumerated_brq_moves:
             row, col = k_row+dy, k_col+dx
             while 0 <= row < 8 and 0 <= col < 8:
                 piece = board[row][col]
                 if piece != "":
-                    if (piece in [state.piece_type["bishops"][colour]] and index < 4) or (piece in [state.piece_type["rooks"][colour]] and index > 3) or piece in [state.piece_type["queens"][colour]]:
+                    if piece == queen or (piece == bishop and index < 4) or (piece == rook and index > 3):
                         return True
                     break
                 row += dy
@@ -466,7 +472,7 @@ class ChessGame:
                             moves.append(((row1, col1), (row2, col2), None))
 
                 elif piece in state.piece_type["knights"]:
-                    for dy, dx in [(-2, -1), (-2, 1), (2, -1), (2, 1), (-1, -2), (-1, 2), (1, -2), (1, 2)]:
+                    for dy, dx in state.knight_moves:
                         row2, col2 = row1 + dy, col1 + dx
                         if 0 <= row2 < 8 and 0 <= col2 < 8 and self.piece_move_valid((row1, col1), (row2, col2)):
                             moves.append(((row1, col1), (row2, col2), None))
@@ -582,7 +588,8 @@ class ChessGame:
         if state.game_over:
             return
         state.current_score = self.score_board()
-        (row1, col1), (row2, col2), promotion_piece = self.negamax((4 if state.white_turn else 4))[0]
+        (row1, col1), (row2, col2), promotion_piece = self.negamax(4)[0]
+        #(row1, col1), (row2, col2), promotion_piece = self.negamax((4 if state.white_turn else 4))[0]
         #(row1, col1), (row2, col2), promotion_piece = self.negamax((min(6, 3 + (8000 - sum(abs(state.material_scores[piece]) for row in state.board for piece in row if piece not in "♔♚")) // 2000)))[0]
         if promotion_piece != None:
             self.state.board[row1][col1] = promotion_piece
@@ -592,7 +599,7 @@ class ChessGame:
         state.white_turn = not state.white_turn
         self.position_check()
         self.draw_board()
-        print(str(time.time() - start_time))
+        print(time.time()-start_time)
 
 
 
@@ -749,7 +756,7 @@ class ChessGame:
         if state.game_over:
             return
         """
-        # AI against AI - can config which side has better depth analysis on line 520.
+        # AI against AI - can config which side has better depth analysis on line 591.
         # This will not slow the speed down, but the messages may not display, or may display and instantly disappear
         while not state.game_over:
             self.ai()
