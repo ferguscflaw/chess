@@ -18,7 +18,7 @@ class GameState:
     def __init__(self) -> None:
         self.king_moved: list[bool] = [False, False]
         self.rook_moved: list[bool] = [False, False, False, False]
-        self.king_castled: list[bool] = [False, False]
+        self.king_castled: list[bool, str] = [False, False]
         self.king_coords: list[tuple[int, int]] = [(7, 4), (0, 4)]
         self.board: list[list[str]] = [
             ["R","N","B","Q", "K","B","N","R"],
@@ -134,7 +134,7 @@ class GameState:
         return result
     
     def export(self) -> str:
-        return base64(("|".join(["/".join(self.format_row(row) for row in self.board), ("w" if self.white_turn else "b"), ("-" if self.en_passent_target is None else f"{self.en_passent_target[0]},{self.en_passent_target[1]}"), str(self.halfmoves), ("".join("1" if k else "0" for k in self.king_moved)), ("".join("1" if r else "0" for r in self.rook_moved)), ("/".join(str(self.king_castled)))])))
+        return base64(("|".join(["/".join(self.format_row(row) for row in self.board), ("w" if self.white_turn else "b"), ("-" if self.en_passent_target is None else f"{self.en_passent_target[0]},{self.en_passent_target[1]}"), str(self.halfmoves), ("".join("1" if k else "0" for k in self.king_moved)), ("".join("1" if r else "0" for r in self.rook_moved)), ("/".join(self.king_castled))])))
     
     def continue_game(self, data) -> None:
         data_sections = base64(data, False).split("|")
@@ -204,7 +204,7 @@ class ChessGame:
         sizes = self.sizes
         col: int = int((x + sizes(False, True) / 2) // sizes(True))
         row: int = int((y + sizes(False, True) / 2 - sizes(False, False, True)/10 + sizes(True)) // sizes(True))
-        if 0 <= row and 0 <= col < 8:
+        if 0 <= row < 8 and 0 <= col < 8:
             return (row if self.flip_board() else 7-row), (col if self.flip_board() else 7-col)
         return None, None
 
@@ -300,12 +300,17 @@ class ChessGame:
 
         pawn = ("P" if white else "p")
         for dx in (-1, 1):
-            if 0 <= (row:=k_row-white*2+1) < 8 and 0 <= (col:=k_col+dx) < 8 and board[row][col] == pawn:
+            if 0 <= (row:=k_row+(1-(white*2))) < 8 and 0 <= (col:=k_col+dx) < 8 and board[row][col] == pawn:
                 return True
             
         knight = ("N" if white else "n")
         for dx, dy in state.knight_moves:
             if 0 <= (row:=k_row+dy) < 8 and 0 <= (col:=k_col+dx) < 8 and board[row][col] == knight:
+                return True
+            
+        king = ("K" if white else "k")
+        for index, (dx, dy) in state.enumerated_brq_moves:
+            if 0 <= (row:=k_row+dy) < 8 and 0 <= (col:=k_col+dx) < 8 and board[row][col] == king:
                 return True
 
         bishop, rook, queen = ("B" if white else "b"), ("R" if white else "r"), ("Q" if white else "q")
@@ -328,9 +333,6 @@ class ChessGame:
         if state.board[row1][col1].islower() == state.board[row2][col2].islower() and state.board[row2][col2] != "":
             return False
         
-        if origin == (0, 1) and target == (2, 2):
-            print(piece_to_move.lower())
-
         if not self.piece_move_valid(origin, target):
             return False
         
@@ -351,7 +353,7 @@ class ChessGame:
             col: int = col1
             while col != col2:
                 original_piece, state.board[row1][col1], state.board[row1][col] = state.board[row1][col], "", piece_to_move
-                state.king_coords[piece_to_move.isupper()] = (row2, col2)
+                state.king_coords[piece_to_move.isupper()] = (row2, col)
                 if self.in_check(white):
                     state.board[row1][col], state.board[row1][col1], state.board[row2][col2] = original_piece, piece_to_move, target_piece
                     state.king_coords[piece_to_move.isupper()] = (row1, col1)
@@ -428,9 +430,9 @@ class ChessGame:
                 piece_score += state.material_scores[piece]
                 pstables_score += state.piece_tables[piece][row_i][col_i]
 
-        castling_score += sum(((50 if rook // 2 == 0 else -50) if moved_yet else 0) for rook, moved_yet in enumerate(state.rook_moved))
-        castling_score += sum(((100 if king == 0 else -100) if moved_yet else 0) for king, moved_yet in enumerate(state.king_moved))
-        castling_score += sum(0 if castled == False else ((200 if castled == "k" else 150) if king == 0 else (-200 if castled == "k" else -150)) for king, castled in enumerate(state.king_castled))
+        castling_score += sum(((20 if rook // 2 == 0 else -20) if moved_yet else 0) for rook, moved_yet in enumerate(state.rook_moved))
+        castling_score += sum(((35 if king == 0 else -35) if moved_yet else 0) for king, moved_yet in enumerate(state.king_moved))
+        castling_score += sum(0 if castled == False else ((100 if castled == "k" else 75) if king == 0 else (-100 if castled == "k" else -75)) for king, castled in enumerate(state.king_castled))
         return piece_score + pstables_score + castling_score
     
 
@@ -457,7 +459,7 @@ class ChessGame:
                     for side in (-1, 1):
                         row2, col2 = row1 + direction, col1 + side
                         if 0 <= row2 < 8 and 0 <= col2 < 8 and self.piece_move_valid((row1, col1), (row2, col2)):
-                            for promotion_piece in (["q", "r", "b", "n"] if (piece == "r" and row2 == 0) else (["Q", "R", "B", "N"] if (piece == "P" and row2 == 7) else [None])):
+                            for promotion_piece in (["q", "r", "b", "n"] if (piece == "p" and row2 == 0) else (["Q", "R", "B", "N"] if (piece == "P" and row2 == 7) else [None])):
                                 moves.append(((row1, col1), (row2, col2), promotion_piece))
                         if (row2, col2) == state.en_passent_target:
                             moves.append(((row1, col1), (row2, col2), None))
@@ -479,7 +481,7 @@ class ChessGame:
                     for dx in (-2, 2):
                         col2 = col1 + dx
                         if 0 <= col2 < 8 and self.piece_move_valid((row1, col1), (row1, col2)):
-                            moves.append(((row1, col1), (row1, col2), None))
+                            moves.append(((row1, col1), (row1, col2), "castling"))
 
                 else:
                     pieces: list[str] = ["b", "B", "r", "R", "q", "Q"]
@@ -494,18 +496,21 @@ class ChessGame:
                             row2 += dy
                             col2 += dx
 
+        state.transposition_table[key] = moves
         return moves
 
 
-    def negamax(self, depth: int, alpha: float=float("-inf"), beta: float=float("inf")) -> int:
+    def negamax(self, depth: int, alpha: float=float("-inf"), beta: float=float("inf")) -> tuple[tuple[tuple[int, int]] | None, int]:
         state: GameState = self.state
         king_coords = state.king_coords
         if depth == 0:
             return (None, state.current_score if state.white_turn else -state.current_score)
-        key = "".join(piece or "." for row in state.board for piece in row) + ("w" if state.white_turn else "b") + "".join(str(int(boolean) for boolean in state.king_moved)) + "".join(str(int(boolean) for boolean in state.rook_moved)) + (str(state.en_passent_target) if state.en_passent_target != None else "")
+        key = "".join(piece or "." for row in state.board for piece in row) + ("w" if state.white_turn else "b") + "".join(str(int(boolean)) for boolean in state.king_moved) + "".join(str(int(boolean)) for boolean in state.rook_moved) + (str(state.en_passent_target) if state.en_passent_target != None else "")
         if key in state.transposition_table:
             if state.transposition_table[key][0] >= depth:
-                return (state.transposition_table[key][1], state.transposition_table[key][2])
+                # Planning to remove this and replace with saving all children and then using the branches of that children to start next search, instead of restarting search every time
+                pass
+                #return (state.transposition_table[key][1], state.transposition_table[key][2])
         probably_possible_moves: list[tuple[tuple[int]]] = self.possible_moves(state.white_turn)
         moves = []
         for move in probably_possible_moves:
@@ -513,17 +518,34 @@ class ChessGame:
             piece_to_move, target_piece = state.board[row1][col1], state.board[row2][col2]
             if piece_to_move.islower() == target_piece.islower() and target_piece != "":
                 continue
-            state.board[row2][col2], state.board[row1][col1] = state.board[row1][col1], ""
-            if piece_to_move.lower() == "k":
-                king_coords[piece_to_move.isupper()] = (row2, col2)
-            if not self.in_check(state.white_turn):
-                moves.append(move)
-            state.board[row1][col1], state.board[row2][col2] = piece_to_move, target_piece
-            if piece_to_move.lower() == "k":
-                king_coords[piece_to_move.isupper()] = (row1, col1)
+            if promotion_piece == "castling":
+                col: int = col1
+                illegal_move = False
+                while col != col2+(1 if col2 > col1 else -1):
+                    state.board[row1][col1], state.board[row1][col] = "", piece_to_move
+                    state.king_coords[piece_to_move.isupper()] = (row2, col)
+                    if self.in_check(state.white_turn):
+                        illegal_move = True
+                        state.board[row1][col], state.board[row1][col1] = "", piece_to_move
+                        king_coords[piece_to_move.isupper()] = (row1, col1)
+                        break
+                    state.board[row1][col], state.board[row1][col1] = "", piece_to_move
+                    king_coords[piece_to_move.isupper()] = (row1, col1)
+                    col += (1 if col2 > col1 else -1)
+                if not illegal_move:
+                    moves.append(((row1, col1), (row2, col2), None))
+            else:
+                state.board[row2][col2], state.board[row1][col1] = state.board[row1][col1], ""
+                if piece_to_move.lower() == "k":
+                    king_coords[piece_to_move.isupper()] = (row2, col2)
+                if not self.in_check(state.white_turn):
+                    moves.append(move)
+                state.board[row1][col1], state.board[row2][col2] = piece_to_move, target_piece
+                if piece_to_move.lower() == "k":
+                    king_coords[piece_to_move.isupper()] = (row1, col1)
         if len(moves) == 0:
             if self.in_check(state.white_turn):
-                return (None, -453421-depth)
+                return (None, -4453421-depth)
             return (None, 0)
         moves.sort(key=lambda move:(1000 * (state.board[move[1][0]][move[1][1]] != "") + (state.material_scores[state.board[move[1][0]][move[1][1]]] if state.board[move[1][0]][move[1][1]] != "" else 0) - (state.material_scores[state.board[move[0][0]][move[0][1]]]) + (0 if move[2] == None else 900)), reverse=True)
         best_score: int | float = float("-inf")
@@ -532,7 +554,6 @@ class ChessGame:
             (row1, col1), (row2, col2), promotion_piece = move
             piece_to_move, target_piece = state.board[row1][col1], state.board[row2][col2]
             state.board[row1][col1], state.board[row2][col2] = "", (promotion_piece if promotion_piece else piece_to_move)
-
             previous_score = state.current_score
             state.current_score -= state.piece_tables[piece_to_move][row1][col1]
             if target_piece != "":
@@ -540,18 +561,20 @@ class ChessGame:
             state.current_score += state.piece_tables[(piece_to_move if promotion_piece == None else promotion_piece)][row2][col2]
             if abs(col2-col1) == 2:
                 state.king_castled[piece_to_move.isupper()] = ("k" if col2-col1 == 2 else "q")
-            state.current_score += ((200 if col2-col1 == 2 else (150 if col2-col1 == -2 else 0)) if piece_to_move == "k" else ((-200 if col2-col1 == 2 else (-150 if col2-col1 == -2 else 0)) if piece_to_move.lower() == "k" else 0))
+            state.current_score += ((100 if col2-col1 == 2 else (75 if col2-col1 == -2 else 0)) if piece_to_move == "k" else ((-100 if col2-col1 == 2 else (-75 if col2-col1 == -2 else 0)) if piece_to_move.lower() == "k" else 0))
             for rook, moved_yet in enumerate(state.rook_moved):
-                state.current_score += ((45 if rook // 2 == 0 else -45) if moved_yet else 0)
+                state.current_score += ((20 if rook // 2 == 0 else -20) if moved_yet else 0)
             for king, moved_yet in enumerate(state.king_moved):
-                state.current_score += ((75 if king == 0 else -75) if moved_yet else 0)
+                state.current_score += ((35 if king == 0 else -35) if moved_yet else 0)
 
             if piece_to_move.lower() == "k":
                 king_coords[piece_to_move.isupper()] = (row2, col2)
             state.white_turn = not state.white_turn
             position_key = "".join(piece or "." for row in state.board for piece in row) + ("w" if state.white_turn else "b")
             state.history[position_key] = state.history.get(position_key, 0) + 1
-            if state.history[position_key] == 3:
+            if target_piece.lower() == "k":
+                score: int = -842938
+            elif state.history[position_key] == 3:
                 score: int = 0
             else:
                 score: int = -(self.negamax(depth-1, -beta, -alpha)[1])
