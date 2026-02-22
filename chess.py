@@ -438,7 +438,7 @@ class ChessGame:
 
     def possible_moves(self, white: bool) -> list[tuple[tuple[int]]]:
         state = self.state
-        key = "".join(piece or "." for row in state.board for piece in row) + ("w" if state.white_turn else "b")
+        key = "".join(piece or "." for row in state.board for piece in row) + ("w" if state.white_turn else "b") + "".join(str(int(boolean)) for boolean in state.king_moved) + "".join(str(int(boolean)) for boolean in state.rook_moved) + (str(state.en_passent_target) if state.en_passent_target != None else "") + "-possible_moves"
         if key in state.transposition_table:
             return state.transposition_table[key]
         moves: list[tuple[tuple[int]]] = []
@@ -503,14 +503,21 @@ class ChessGame:
     def negamax(self, depth: int, alpha: float=float("-inf"), beta: float=float("inf")) -> tuple[tuple[tuple[int, int]] | None, int]:
         state: GameState = self.state
         king_coords = state.king_coords
+        alpha_original = alpha
         if depth == 0:
             return (None, state.current_score if state.white_turn else -state.current_score)
-        key = "".join(piece or "." for row in state.board for piece in row) + ("w" if state.white_turn else "b") + "".join(str(int(boolean)) for boolean in state.king_moved) + "".join(str(int(boolean)) for boolean in state.rook_moved) + (str(state.en_passent_target) if state.en_passent_target != None else "")
+        key = "".join(piece or "." for row in state.board for piece in row) + ("w" if state.white_turn else "b") + "".join(str(int(boolean)) for boolean in state.king_moved) + "".join(str(int(boolean)) for boolean in state.rook_moved) + (str(state.en_passent_target) if state.en_passent_target != None else "") + "-negamax"
         if key in state.transposition_table:
-            if state.transposition_table[key][0] >= depth:
-                # Planning to remove this and replace with saving all children and then using the branches of that children to start next search, instead of restarting search every time
-                pass
-                #return (state.transposition_table[key][1], state.transposition_table[key][2])
+            previous_search = state.transposition_table[key]
+            if previous_search[0] >= depth:
+                if previous_search[3] == "EXACT":
+                    return (previous_search[1], previous_search[2])
+                elif previous_search[3] == "LOWERBOUND":
+                    alpha = max(alpha, previous_search[2])
+                elif previous_search[3] == "UPPERBOUND":
+                    beta = min(beta, previous_search[2])
+                if alpha >= beta:
+                    return (previous_search[1], previous_search[2])
         probably_possible_moves: list[tuple[tuple[int]]] = self.possible_moves(state.white_turn)
         moves = []
         for move in probably_possible_moves:
@@ -590,10 +597,10 @@ class ChessGame:
             state.white_turn = not state.white_turn
             if score > best_score:
                 best_move, best_score = move, score
-            alpha, best_score = max(alpha, score), max(best_score, score)    
+            alpha = max(alpha, score)  
             if alpha >= beta:
                 break
-        state.transposition_table[key] = (depth, best_move, best_score)
+        state.transposition_table[key] = (depth, best_move, best_score, ("UPPERBOUND" if best_score <= alpha_original else ("LOWERBOUND" if best_score >= beta else "EXACT")))
         return (best_move, best_score)
         
     def ai(self) -> None:
@@ -602,7 +609,7 @@ class ChessGame:
             return
         state.current_score = self.score_board()
         #(row1, col1), (row2, col2), promotion_piece = self.negamax((4 if state.white_turn else 4))[0]
-        (row1, col1), (row2, col2), promotion_piece = self.negamax((min(5, 3 + (8000 - sum(abs(state.material_scores[piece]) for row in state.board for piece in row if piece.lower() != "k" and piece != "")) // 2500)))[0]
+        (row1, col1), (row2, col2), promotion_piece = self.negamax((min(5, 4 + (8000 - sum(abs(state.material_scores[piece]) for row in state.board for piece in row if piece.lower() != "k" and piece != "")) // 5000)))[0]
         if promotion_piece != None:
             self.state.board[row1][col1] = promotion_piece
         if state.board[row1][col1].lower() == "k":
